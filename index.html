@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -190,15 +191,36 @@
                 setTimeout(() => setToast(null), 3500);
             };
 
-            // 核心邏輯：計算特定帳單截止狀態
+            // 【核心安全升級：逆向防漏狀態判定】
             const getBillStatus = (bill, card) => {
-                if (bill.amount === 0) {
-                    return { code: 'EMPTY', text: '待登錄', color: 'text-slate-400 bg-slate-50 border-slate-200', daysLeft: null };
-                }
+                // 情境 1: 已標記處理
                 if (bill.isPaid) {
-                    return { code: 'PAID', text: '已繳清', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', daysLeft: null };
+                    if (bill.amount === 0) {
+                        return { code: 'NO_SPENDING', text: '🟢 本月無消費', color: 'text-slate-500 bg-slate-100 border-slate-200', daysLeft: null };
+                    }
+                    return { code: 'PAID', text: '🟢 已繳清', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', daysLeft: null };
                 }
 
+                // 判斷該帳單月份是否已經到來（比今天模擬的 5/21 早或相同）
+                const isBillMonthArrived = (bill.year < TODAY.getFullYear()) || 
+                                           (bill.year === TODAY.getFullYear() && bill.month <= (TODAY.getMonth() + 1));
+
+                // 情境 2: 時間到了，但金額卻維持 0 且「未核銷」➡️ 判定為【待確認帳單】
+                if (bill.amount === 0 && isBillMonthArrived) {
+                    return { 
+                        code: 'UNCONFIRMED', 
+                        text: '⚠️ 待確認帳單', 
+                        color: 'text-amber-800 bg-amber-50 border-amber-300 animate-pulse font-bold', 
+                        daysLeft: 0 
+                    };
+                }
+
+                // 情境 3: 未來的月份，且未開單，此時顯示灰色安全狀態
+                if (bill.amount === 0) {
+                    return { code: 'EMPTY', text: '未開期', color: 'text-gray-400 bg-gray-50 border-gray-200', daysLeft: null };
+                }
+
+                // 情境 4: 正常的應繳金額倒數
                 const dueDateObj = new Date(bill.year, bill.month - 1, card.dueDate);
                 const diffTime = dueDateObj - TODAY;
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -206,14 +228,14 @@
                 if (diffDays < 0) {
                     return { 
                         code: 'OVERDUE', 
-                        text: `已逾期 ${Math.abs(diffDays)} 天`, 
+                        text: `🚨 已逾期 ${Math.abs(diffDays)} 天`, 
                         color: 'text-rose-700 bg-rose-50 border-rose-200 animate-pulse font-bold', 
                         daysLeft: diffDays 
                     };
                 } else if (diffDays <= remindDaysBefore) {
                     return { 
                         code: 'WARNING', 
-                        text: `剩餘 ${diffDays} 天`, 
+                        text: `⏰ 剩餘 ${diffDays} 天`, 
                         color: 'text-amber-700 bg-amber-50 border-amber-200 font-bold', 
                         daysLeft: diffDays 
                     };
@@ -231,6 +253,7 @@
                 let totalUnpaid = 0;
                 let overdueCount = 0;
                 let upcomingCount = 0;
+                let unconfirmedCount = 0; // 新增：待確認帳單計數
                 const alertList = [];
 
                 bills.forEach(bill => {
@@ -247,10 +270,13 @@
                             upcomingCount++;
                             alertList.push({ bill, card, status, priority: 2 });
                         }
+                    } else if (status.code === 'UNCONFIRMED') {
+                        unconfirmedCount++;
+                        alertList.push({ bill, card, status, priority: 3 });
                     }
                 });
 
-                return { totalUnpaid, overdueCount, upcomingCount, alertList };
+                return { totalUnpaid, overdueCount, upcomingCount, unconfirmedCount, alertList };
             }, [bills, cards, remindDaysBefore]);
 
             // iOS 原生通知觸發
@@ -275,8 +301,7 @@
                 return false;
             };
 
-            // 【核心升級：捷徑開機自動對帳推播】
-            // 如果網址帶有 ?source=shortcut，App 在啟動時會自動且立刻對帳，並直接推送系統通知！
+            // 捷徑定時自動巡檢檢查：包含「逾期未繳」與「待確認帳單」
             const hasAutoChecked = useRef(false);
             useEffect(() => {
                 if (hasAutoChecked.current) return;
@@ -286,26 +311,40 @@
 
                 if (isFromShortcut && isNoonReminderEnabled) {
                     hasAutoChecked.current = true;
-                    // 延遲 1.2 秒執行，確保 iOS PWA 喚醒完畢且畫面渲染完成
                     const timer = setTimeout(() => {
-                        if (stats.overdueCount > 0) {
-                            const overdueDetails = stats.alertList
-                                .filter(item => item.status.code === 'OVERDUE')
-                                .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
-                                .join(', ');
+                        const hasOverdue = stats.overdueCount > 0;
+                        const hasUnconfirmed = stats.unconfirmedCount > 0;
 
-                            const title = '🚨 卡費逾期！請立刻繳納';
-                            const body = `自動巡檢：您有 ${stats.overdueCount} 筆卡費已逾期 (${overdueDetails})。請立即繳款！`;
+                        if (hasOverdue || hasUnconfirmed) {
+                            let title = '🚨 卡費防漏警戒提醒！';
+                            let body = '';
+
+                            if (hasOverdue) {
+                                const overdueDetails = stats.alertList
+                                    .filter(item => item.status.code === 'OVERDUE')
+                                    .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
+                                    .join(', ');
+                                body += `您有 ${stats.overdueCount} 筆卡費已逾期 (${overdueDetails})！`;
+                            }
+
+                            if (hasUnconfirmed) {
+                                const unconfirmedDetails = stats.alertList
+                                    .filter(item => item.status.code === 'UNCONFIRMED')
+                                    .map(item => `【${item.card.name} ${item.bill.month}月】`)
+                                    .join(', ');
+                                if (body) body += ' 另外，';
+                                body += `發現未確認帳單 ${unconfirmedDetails}，請上網銀確認金額或標記「無消費」！`;
+                            }
                             
                             triggerNativeNotification(title, body);
-                            showToast('🔔 捷徑喚醒：已自動發送逾期對帳通知！');
+                            showToast('🔔 捷徑對帳：已自動發送系統提醒！');
                         } else {
-                            showToast('☕ 捷徑喚醒：巡檢完成，今日無逾期帳單。', 'success');
+                            showToast('☕ 捷徑對帳：巡檢完成，所有卡費均已核銷清空。', 'success');
                         }
                     }, 1200);
                     return () => clearTimeout(timer);
                 }
-            }, [stats.overdueCount, isNoonReminderEnabled]);
+            }, [stats.overdueCount, stats.unconfirmedCount, isNoonReminderEnabled]);
 
             const requestNotificationPermission = async () => {
                 if (!('Notification' in window)) {
@@ -318,7 +357,7 @@
                     setNotificationPermission(permission);
                     if (permission === 'granted') {
                         showToast('🎉 通知權限授權成功！');
-                        triggerNativeNotification('🔔 卡費管家', '中午定時巡檢通知已成功開啟！');
+                        triggerNativeNotification('🔔 卡費管家', '定時巡檢通知已成功開啟！');
                     } else {
                         showToast('😢 權限遭拒。請前往 iPhone 的「設定」>「通知」>「卡費管家」開啟通知。', 'warning');
                     }
@@ -327,30 +366,45 @@
                 }
             };
 
-            // 手動模擬
+            // 手動對帳測試
             const simulateNoonCheck = () => {
                 if (!isNoonReminderEnabled) {
-                    showToast('您已在設定中關閉了中午提醒。', 'info');
+                    showToast('您已在設定中關閉了自動提醒。', 'info');
                     return;
                 }
 
-                if (stats.overdueCount > 0) {
-                    const overdueDetails = stats.alertList
-                        .filter(item => item.status.code === 'OVERDUE')
-                        .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
-                        .join(', ');
+                const hasOverdue = stats.overdueCount > 0;
+                const hasUnconfirmed = stats.unconfirmedCount > 0;
 
-                    const title = '🚨 卡費逾期！請立刻繳納';
-                    const body = `提醒：您有 ${stats.overdueCount} 筆卡費過期了 (${overdueDetails})。繳費完請記得到 App 內勾選已繳！`;
+                if (hasOverdue || hasUnconfirmed) {
+                    let title = '🚨 卡費防漏定時巡檢';
+                    let body = '';
+
+                    if (hasOverdue) {
+                        const overdueDetails = stats.alertList
+                            .filter(item => item.status.code === 'OVERDUE')
+                            .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
+                            .join(', ');
+                        body += `有 ${stats.overdueCount} 筆卡費過期 (${overdueDetails})。`;
+                    }
+
+                    if (hasUnconfirmed) {
+                        const unconfirmedDetails = stats.alertList
+                            .filter(item => item.status.code === 'UNCONFIRMED')
+                            .map(item => `【${item.card.name} ${item.bill.month}月】`)
+                            .join(', ');
+                        if (body) body += ' 另外，';
+                        body += `有未確認帳單 ${unconfirmedDetails}，請核對網銀以防漏繳！`;
+                    }
                     
                     const sent = triggerNativeNotification(title, body);
                     if (sent) {
-                        showToast('🔔 成功在手機系統頂部彈出「逾期通知推播」！');
+                        showToast('🔔 成功在手機系統頂部彈出「定時對帳通知」！');
                     } else {
                         showToast(`📱 手機模擬通知：\n${title}\n${body}`, 'warning');
                     }
                 } else {
-                    showToast('☕ 中午檢查完成：目前沒有任何逾期帳單。您真守信！', 'success');
+                    showToast('☕ 檢查完成：目前沒有任何逾期或未確認帳單。您真守信！', 'success');
                 }
             };
 
@@ -360,7 +414,7 @@
                     showToast('請輸入正確的金額數字', 'error');
                     return;
                 }
-                setBills(prev => prev.map(b => b.id === billId ? { ...b, amount: numVal } : b));
+                setBills(prev => prev.map(b => b.id === billId ? { ...b, amount: numVal, isPaid: false } : b));
                 setEditingCell(null);
                 showToast('帳單金額已更新並安全儲存！ 💾');
             };
@@ -371,6 +425,17 @@
                         const nextState = !b.isPaid;
                         showToast(nextState ? '🎉 已標記為已繳清！中午不會再跳出通知了。' : '帳單已被設定回未繳狀態。', nextState ? 'success' : 'info');
                         return { ...b, isPaid: nextState };
+                    }
+                    return b;
+                }));
+            };
+
+            // 新功能：一鍵確認本月無消費（安全核銷）
+            const markAsNoSpending = (billId) => {
+                setBills(prev => prev.map(b => {
+                    if (b.id === billId) {
+                        showToast('👌 已確認此期無消費，警報解除！');
+                        return { ...b, amount: 0, isPaid: true };
                     }
                     return b;
                 }));
@@ -522,19 +587,19 @@
                                         <p className="text-xl font-extrabold text-slate-900 mt-1">
                                             ${stats.totalUnpaid.toLocaleString()}
                                         </p>
-                                        <div className="text-[9px] text-slate-400 mt-1">累積未繳費總額</div>
+                                        <div className="text-[9px] text-slate-400 mt-1">累積確認應繳金額</div>
                                     </div>
 
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
-                                        <p className="text-[10px] font-bold text-rose-600 uppercase flex items-center gap-1">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                                            已逾期筆數
+                                        <p className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                            未確認/逾期
                                         </p>
-                                        <p className="text-xl font-extrabold text-rose-600 mt-1">
-                                            {stats.overdueCount} <span className="text-xs font-normal text-slate-400">筆</span>
+                                        <p className="text-xl font-extrabold text-amber-600 mt-1">
+                                            {(stats.overdueCount + stats.unconfirmedCount)} <span className="text-xs font-normal text-slate-400">筆</span>
                                         </p>
-                                        <div className="text-[9px] text-rose-500 mt-1 font-bold">
-                                            {stats.overdueCount > 0 ? '⚠️ 中午將強制彈出推播' : '🎉 狀態一切安全'}
+                                        <div className="text-[9px] text-amber-600 mt-1 font-bold">
+                                            {stats.unconfirmedCount > 0 ? '⚠️ 存在未核對帳單！' : '🎉 所有帳單均已掌握'}
                                         </div>
                                     </div>
                                 </div>
@@ -550,7 +615,7 @@
                                                 <h4 className="font-bold text-indigo-950 text-xs">
                                                     中午 12:00 逾期提醒
                                                 </h4>
-                                                <p className="text-[9px] text-indigo-700 font-medium">只要有逾期未繳，每天中午主動推播</p>
+                                                <p className="text-[9px] text-indigo-700 font-medium">只要有逾期或「未確認」帳單，每天中午主動推播</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-2 shrink-0">
@@ -592,7 +657,7 @@
                                 </div>
 
                                 {/* 5 號固定警戒提醒框 */}
-                                {TODAY.getDate() >= alertDayOfMonth && stats.totalUnpaid > 0 && (
+                                {TODAY.getDate() >= alertDayOfMonth && (stats.totalUnpaid > 0 || stats.unconfirmedCount > 0) && (
                                     <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
                                         <span className="p-1.5 bg-amber-100 rounded-lg text-amber-600 shrink-0 mt-0.5">
                                             <AlertIcon className="w-4 h-4" />
@@ -602,7 +667,7 @@
                                                 🚨 注意：今日已過每月 {alertDayOfMonth} 號對帳日！
                                             </h4>
                                             <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
-                                                目前仍有卡費尚未核銷。為避免逾期，在您將款項點選並標記為<strong>「已繳清」</strong>之前，App 中午將會持續提示，請儘速繳納！
+                                                系統發現您有未繳清的卡費，或有<strong>未確認登錄金額</strong>的卡片。為了確保不漏繳，請確認金額或標記為「無消費」，否則中午將持續提醒您。
                                             </p>
                                         </div>
                                     </div>
@@ -616,7 +681,7 @@
                                                 <CalendarIcon className="text-indigo-600 w-4 h-4" />
                                                 應繳金額登錄區
                                             </h2>
-                                            <p className="text-[9px] text-slate-400 mt-0.5">點擊金額可修改數值，點按鈕快速變更已繳狀態。</p>
+                                            <p className="text-[9px] text-slate-400 mt-0.5">時間到未登錄將強制亮起黃色警告，直到您確認為止。</p>
                                         </div>
 
                                         {/* 下拉新增月份 */}
@@ -685,7 +750,7 @@
                                                                                 setEditingCell(bill.id);
                                                                                 setEditValue(bill.amount.toString());
                                                                             }}
-                                                                            className="text-sm font-extrabold text-slate-900 cursor-pointer py-1 px-1 bg-slate-50 rounded text-center hover:bg-slate-100 border border-dashed border-slate-200"
+                                                                            className="text-xs font-extrabold text-slate-900 cursor-pointer py-1 px-1 bg-slate-50 rounded text-center hover:bg-slate-100 border border-dashed border-slate-200"
                                                                             title="點擊編輯應繳金額"
                                                                         >
                                                                             ${bill.amount.toLocaleString()}
@@ -697,7 +762,16 @@
                                                                     <div className={`text-[8px] font-extrabold py-0.5 rounded-md text-center border ${status.color}`}>
                                                                         {status.text}
                                                                     </div>
-                                                                    {bill.amount > 0 && (
+                                                                    
+                                                                    {/* 依據狀態顯示最實用的按鈕組 */}
+                                                                    {status.code === 'UNCONFIRMED' ? (
+                                                                        <button
+                                                                            onClick={() => markAsNoSpending(bill.id)}
+                                                                            className="w-full py-1 text-[9px] font-bold rounded-lg text-slate-600 bg-slate-100 border border-slate-200 active:scale-95"
+                                                                        >
+                                                                            本月無消費
+                                                                        </button>
+                                                                    ) : bill.amount > 0 ? (
                                                                         <button
                                                                             onClick={() => togglePaid(bill.id)}
                                                                             className={`w-full py-1 text-[9px] font-bold rounded-lg transition-all border active:scale-95 ${
@@ -708,7 +782,7 @@
                                                                         >
                                                                             {bill.isPaid ? '回復為未繳' : '一鍵標記已繳'}
                                                                         </button>
-                                                                    )}
+                                                                    ) : null}
                                                                 </div>
                                                             </div>
                                                         );
@@ -735,7 +809,7 @@
                                             <span className="font-extrabold text-indigo-600">中午 12:00</span>
                                         </div>
                                         <p className="text-[10px] text-slate-500 leading-relaxed">
-                                            開啟後，系統若在中午檢查到任何一張卡費「已過截止日」卻「尚未繳清」，會立刻向您的 iPhone 鎖定畫面發出警告。
+                                            開啟後，系統若在中午檢查到任何一張卡費「已過截止日」或「尚未核對金額（待確認帳單）」，會立刻向您的 iPhone 鎖定畫面發出警告。
                                         </p>
 
                                         <div className="pt-1.5 flex items-center space-x-4">
@@ -797,9 +871,6 @@
                                             />
                                             <span className="text-xs font-black text-slate-700">Aa (大)</span>
                                         </div>
-                                        <p className="text-[9px] text-slate-400 leading-snug">
-                                            💡 提示：如果覺得預設的文字太小，可以用手指拖動上方拉桿，整個 App 畫面上的字體將會立刻按比例同步完美放大。
-                                        </p>
                                     </div>
                                 </div>
 
@@ -952,3 +1023,5 @@
     </script>
 </body>
 </html>
+
+```
