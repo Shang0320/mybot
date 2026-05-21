@@ -117,6 +117,12 @@
                 return saved ? saved === 'true' : true;
             });
 
+            // 新增：字體大小比例狀態（預設 100%）
+            const [fontSizeScale, setFontSizeScale] = useState(() => {
+                const saved = localStorage.getItem('reminder_font_size_scale');
+                return saved ? parseInt(saved) : 100;
+            });
+
             const [notificationPermission, setNotificationPermission] = useState('default');
             const [editingCell, setEditingCell] = useState(null);
             const [editValue, setEditValue] = useState('');
@@ -145,6 +151,12 @@
             useEffect(() => {
                 localStorage.setItem('reminder_noon_enabled', isNoonReminderEnabled.toString());
             }, [isNoonReminderEnabled]);
+
+            // 新增：監聽字體大小改變並直接寫入 HTML 根節點
+            useEffect(() => {
+                localStorage.setItem('reminder_font_size_scale', fontSizeScale.toString());
+                document.documentElement.style.fontSize = `${fontSizeScale}%`;
+            }, [fontSizeScale]);
 
             useEffect(() => {
                 if ('Notification' in window) {
@@ -686,6 +698,48 @@
                                                 <span>暫停中午提醒</span>
                                             </label>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* 新增：字體大小調節拉桿區 */}
+                                <div className="border-b border-slate-100 pb-4 space-y-3">
+                                    <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                        <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        A⁺ 介面字體大小放大拉桿
+                                    </h3>
+                                    
+                                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-slate-500">目前比例：<strong className="text-indigo-600">{fontSizeScale}%</strong></span>
+                                            <button 
+                                                onClick={() => {
+                                                    setFontSizeScale(100);
+                                                    showToast('已恢復預設 100% 字體大小！');
+                                                }}
+                                                className="text-[10px] bg-white border border-slate-200 text-slate-600 font-semibold px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                                            >
+                                                重設回預設 (100%)
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-3.5">
+                                            <span className="text-xs font-medium text-slate-400">A- (小)</span>
+                                            <input 
+                                                type="range" 
+                                                min="80" 
+                                                max="150" 
+                                                step="5"
+                                                value={fontSizeScale} 
+                                                onChange={(e) => setFontSizeScale(parseInt(e.target.value))}
+                                                className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                            />
+                                            <span className="text-sm font-bold text-slate-700">A+ (大)</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 leading-snug">
+                                            💡 提示：此拉桿支援實時縮放。若您覺得手機畫面字太小，可以直接拉到 120% ~ 140% 獲得最清晰舒適的閱讀觀看體驗！
+                                        </p>
                                     </div>
                                 </div>
 
