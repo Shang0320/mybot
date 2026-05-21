@@ -5,32 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>智慧信用卡繳費管家</title>
     
-    <!-- iOS PWA 專屬設定：讓網頁在 iPhone 上像真正的 App 一樣全螢幕運行 -->
+    <!-- iOS PWA 專屬設定：讓網頁在 iPhone 上完美模擬原生 App -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="卡費管家">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1155/1155050.png">
 
-    <!-- 載入 React 18, Babel (在瀏覽器中編譯 JSX) 與 Tailwind CSS CDN -->
+    <!-- 引入 PWA 關鍵連結描述檔 -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- 載入 React 18, Babel 與 Tailwind CSS CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        /* 支援 iOS 底部安全區域，防止 Home 指示條遮擋內容 */
+        /* 針對 iOS 滿版全螢幕微調，提供頂部與底部安全邊距 */
         body {
-            padding-bottom: env(safe-area-inset-bottom, 24px);
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
             -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        /* 隱藏滾動條但保持滾動功能 */
+        ::-webkit-scrollbar {
+            display: none;
         }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased select-none">
     <div id="root"></div>
 
+    <!-- 註冊 Service Worker：這是讓 iPhone「捷徑」能找到 App 並發送通知的關鍵技術 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW 註冊成功:', reg.scope))
+                    .catch(err => console.log('SW 註冊失敗:', err));
+            });
+        }
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // --- 精緻內嵌 SVG 圖示 ---
         const CreditCardIcon = ({ className = "w-5 h-5" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -78,49 +99,63 @@
             </svg>
         );
 
+        // 安全地讀取 LocalStorage
+        const safeGetItem = (key, defaultValue) => {
+            try {
+                const item = localStorage.getItem(key);
+                return item ? JSON.parse(item) : defaultValue;
+            } catch (e) {
+                console.warn("無法存取 LocalStorage", e);
+                return defaultValue;
+            }
+        };
+
+        // 安全地寫入 LocalStorage
+        const safeSetItem = (key, value) => {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (e) {
+                console.warn("寫入 LocalStorage 失敗", e);
+            }
+        };
+
         function App() {
-            // 模擬今天時間：2026年5月21日
+            // 固定模擬時間：2026 年 5 月 21 日
             const TODAY = useMemo(() => new Date(2026, 4, 21), []); // 4 代表 5 月
 
-            const [cards, setCards] = useState(() => {
-                const saved = localStorage.getItem('reminder_cards');
-                return saved ? JSON.parse(saved) : [
-                    { id: 'sinopac', name: '永豐銀行', dueDate: 15, billCycle: '每月25日結帳', color: 'indigo' },
-                    { id: 'fubon', name: '富邦銀行', dueDate: 25, billCycle: '每月5日結帳', color: 'blue' }
-                ];
-            });
+            const [cards, setCards] = useState(() => safeGetItem('reminder_cards', [
+                { id: 'sinopac', name: '永豐銀行', dueDate: 15, billCycle: '每月25日結帳', color: 'indigo' },
+                { id: 'fubon', name: '富邦銀行', dueDate: 25, billCycle: '每月5日結帳', color: 'blue' }
+            ]));
 
-            const [bills, setBills] = useState(() => {
-                const saved = localStorage.getItem('reminder_bills');
-                return saved ? JSON.parse(saved) : [
-                    { id: '1', cardId: 'sinopac', year: 2026, month: 5, amount: 13716, isPaid: false },
-                    { id: '2', cardId: 'fubon', year: 2026, month: 5, amount: 9000, isPaid: false },
-                    { id: '3', cardId: 'sinopac', year: 2026, month: 6, amount: 0, isPaid: false },
-                    { id: '4', cardId: 'fubon', year: 2026, month: 6, amount: 0, isPaid: false },
-                    { id: '5', cardId: 'sinopac', year: 2026, month: 7, amount: 0, isPaid: false },
-                    { id: '6', cardId: 'fubon', year: 2026, month: 7, amount: 0, isPaid: false }
-                ];
-            });
+            const [bills, setBills] = useState(() => safeGetItem('reminder_bills', [
+                { id: '1', cardId: 'sinopac', year: 2026, month: 5, amount: 13716, isPaid: false },
+                { id: '2', cardId: 'fubon', year: 2026, month: 5, amount: 9000, isPaid: false },
+                { id: '3', cardId: 'sinopac', year: 2026, month: 6, amount: 0, isPaid: false },
+                { id: '4', cardId: 'fubon', year: 2026, month: 6, amount: 0, isPaid: false },
+                { id: '5', cardId: 'sinopac', year: 2026, month: 7, amount: 0, isPaid: false },
+                { id: '6', cardId: 'fubon', year: 2026, month: 7, amount: 0, isPaid: false }
+            ]));
 
             const [alertDayOfMonth, setAlertDayOfMonth] = useState(() => {
-                const saved = localStorage.getItem('reminder_alert_day');
-                return saved ? parseInt(saved) : 5;
+                const saved = safeGetItem('reminder_alert_day', 5);
+                return saved;
             });
 
             const [remindDaysBefore, setRemindDaysBefore] = useState(() => {
-                const saved = localStorage.getItem('reminder_days_before');
-                return saved ? parseInt(saved) : 3;
+                const saved = safeGetItem('reminder_days_before', 3);
+                return saved;
             });
 
             const [isNoonReminderEnabled, setIsNoonReminderEnabled] = useState(() => {
-                const saved = localStorage.getItem('reminder_noon_enabled');
-                return saved ? saved === 'true' : true;
+                const saved = safeGetItem('reminder_noon_enabled', true);
+                return saved;
             });
 
-            // 新增：字體大小比例狀態（預設 100%）
+            // 介面字體大小縮放比例 (80 - 150)
             const [fontSizeScale, setFontSizeScale] = useState(() => {
-                const saved = localStorage.getItem('reminder_font_size_scale');
-                return saved ? parseInt(saved) : 100;
+                const saved = safeGetItem('reminder_font_size_scale', 100);
+                return saved;
             });
 
             const [notificationPermission, setNotificationPermission] = useState('default');
@@ -129,32 +164,18 @@
             const [toast, setToast] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [newMonthVal, setNewMonthVal] = useState(8);
-            
             const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-            useEffect(() => {
-                localStorage.setItem('reminder_cards', JSON.stringify(cards));
-            }, [cards]);
+            // 當狀態改變時，寫入 LocalStorage 儲存
+            useEffect(() => { safeSetItem('reminder_cards', cards); }, [cards]);
+            useEffect(() => { safeSetItem('reminder_bills', bills); }, [bills]);
+            useEffect(() => { safeSetItem('reminder_alert_day', alertDayOfMonth); }, [alertDayOfMonth]);
+            useEffect(() => { safeSetItem('reminder_days_before', remindDaysBefore); }, [remindDaysBefore]);
+            useEffect(() => { safeSetItem('reminder_noon_enabled', isNoonReminderEnabled); }, [isNoonReminderEnabled]);
 
+            // 當字體大小改變時，調整 HTML 根節點的字體尺寸以達到無縫全螢幕縮放
             useEffect(() => {
-                localStorage.setItem('reminder_bills', JSON.stringify(bills));
-            }, [bills]);
-
-            useEffect(() => {
-                localStorage.setItem('reminder_alert_day', alertDayOfMonth.toString());
-            }, [alertDayOfMonth]);
-
-            useEffect(() => {
-                localStorage.setItem('reminder_days_before', remindDaysBefore.toString());
-            }, [remindDaysBefore]);
-
-            useEffect(() => {
-                localStorage.setItem('reminder_noon_enabled', isNoonReminderEnabled.toString());
-            }, [isNoonReminderEnabled]);
-
-            // 新增：監聽字體大小改變並直接寫入 HTML 根節點
-            useEffect(() => {
-                localStorage.setItem('reminder_font_size_scale', fontSizeScale.toString());
+                safeSetItem('reminder_font_size_scale', fontSizeScale);
                 document.documentElement.style.fontSize = `${fontSizeScale}%`;
             }, [fontSizeScale]);
 
@@ -166,12 +187,13 @@
 
             const showToast = (message, type = 'success') => {
                 setToast({ message, type });
-                setTimeout(() => setToast(null), 4000);
+                setTimeout(() => setToast(null), 3500);
             };
 
+            // 核心邏輯：計算特定帳單截止狀態
             const getBillStatus = (bill, card) => {
                 if (bill.amount === 0) {
-                    return { code: 'EMPTY', text: '待登錄', color: 'text-gray-400 bg-gray-50 border-gray-200', daysLeft: null };
+                    return { code: 'EMPTY', text: '待登錄', color: 'text-slate-400 bg-slate-50 border-slate-200', daysLeft: null };
                 }
                 if (bill.isPaid) {
                     return { code: 'PAID', text: '已繳清', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', daysLeft: null };
@@ -231,9 +253,9 @@
                 return { totalUnpaid, overdueCount, upcomingCount, alertList };
             }, [bills, cards, remindDaysBefore]);
 
+            // iOS 原生通知觸發
             const triggerNativeNotification = (title, body) => {
                 if (!('Notification' in window)) return false;
-                
                 if (Notification.permission === 'granted') {
                     try {
                         const options = {
@@ -246,7 +268,7 @@
                         new Notification(title, options);
                         return true;
                     } catch (err) {
-                        console.error('發送通知失敗:', err);
+                        console.error('通知發送失敗:', err);
                         return false;
                     }
                 }
@@ -255,7 +277,7 @@
 
             const requestNotificationPermission = async () => {
                 if (!('Notification' in window)) {
-                    showToast('⚠️ 您的瀏覽器暫不支援網頁通知。若是 iPhone 請先「加入主畫面」後從桌面打開！', 'warning');
+                    showToast('⚠️ 您的瀏覽器暫不支援網頁通知。請先將本網頁「加入主畫面」後再試！', 'warning');
                     return;
                 }
 
@@ -263,39 +285,40 @@
                     const permission = await Notification.requestPermission();
                     setNotificationPermission(permission);
                     if (permission === 'granted') {
-                        showToast('🎉 通知功能已成功授權！');
-                        triggerNativeNotification('🔔 卡費管家：通知已啟用！', '只要卡費逾期，每天中午將會準時提醒您！');
+                        showToast('🎉 通知權限授權成功！');
+                        triggerNativeNotification('🔔 卡費管家', '中午定時巡檢通知已成功開啟！');
                     } else {
-                        showToast('😢 權限遭拒。請至 iPhone「設定」>「通知」> 找到「卡費管家」並開啟通知。', 'warning');
+                        showToast('😢 權限遭拒。請前往 iPhone 的「設定」>「通知」>「卡費管家」開啟通知。', 'warning');
                     }
                 } catch (e) {
-                    showToast('請先將此網頁「加入主畫面」成為獨立 App，才能在 iPhone 開啟通知功能！', 'warning');
+                    showToast('請先將此網頁「加入主畫面」成為桌面 App 才能開啟通知！', 'warning');
                 }
             };
 
+            // 模擬每天中午對帳通知
             const simulateNoonCheck = () => {
                 if (!isNoonReminderEnabled) {
-                    showToast('您已關閉中午提醒功能。', 'info');
+                    showToast('您已在設定中關閉了中午提醒。', 'info');
                     return;
                 }
 
                 if (stats.overdueCount > 0) {
-                    const overdueListText = stats.alertList
+                    const overdueDetails = stats.alertList
                         .filter(item => item.status.code === 'OVERDUE')
                         .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
                         .join(', ');
 
-                    const title = '🚨 卡費過期警告！請立刻繳納';
-                    const body = `檢查發現您有 ${stats.overdueCount} 筆卡費已逾期 (${overdueListText})。請立即繳款，繳款後點此登記！`;
+                    const title = '🚨 卡費逾期！請立刻繳納';
+                    const body = `提醒：您有 ${stats.overdueCount} 筆卡費過期了 (${overdueDetails})。繳費完請記得到 App 內勾選已繳！`;
                     
                     const sent = triggerNativeNotification(title, body);
                     if (sent) {
-                        showToast('🔔 成功在手機頂部彈出「逾期通知提醒」！');
+                        showToast('🔔 成功在手機系統頂部彈出「逾期通知推播」！');
                     } else {
-                        showToast(`📱 模擬【中午 12:00 逾期通知】：\n${title}\n${body}`, 'warning');
+                        showToast(`📱 手機模擬通知：\n${title}\n${body}`, 'warning');
                     }
                 } else {
-                    showToast('☕ 中午檢查完成：目前沒有任何逾期未繳的信用卡，不發送打擾通知。表現優異！', 'success');
+                    showToast('☕ 中午檢查完成：目前沒有任何逾期帳單。您真守信！', 'success');
                 }
             };
 
@@ -307,14 +330,14 @@
                 }
                 setBills(prev => prev.map(b => b.id === billId ? { ...b, amount: numVal } : b));
                 setEditingCell(null);
-                showToast('帳單金額已儲存！資料不會丟失 💾');
+                showToast('帳單金額已更新並安全儲存！ 💾');
             };
 
             const togglePaid = (billId) => {
                 setBills(prev => prev.map(b => {
                     if (b.id === billId) {
                         const nextState = !b.isPaid;
-                        showToast(nextState ? '🎉 太棒了！已標記為已繳清！' : '帳單已被重設為未繳狀態', nextState ? 'success' : 'info');
+                        showToast(nextState ? '🎉 已標記為已繳清！中午不會再跳出通知了。' : '帳單已被設定回未繳狀態。', nextState ? 'success' : 'info');
                         return { ...b, isPaid: nextState };
                     }
                     return b;
@@ -325,7 +348,7 @@
                 const monthStr = newMonthVal;
                 const exist = bills.some(b => b.month === monthStr && b.year === 2026);
                 if (exist) {
-                    showToast(`${monthStr}月份已存在於列表中！`, 'error');
+                    showToast(`${monthStr} 月份已存在！`, 'error');
                     return;
                 }
 
@@ -339,13 +362,17 @@
                 }));
 
                 setBills(prev => [...prev, ...newBills]);
-                showToast(`成功新增 ${monthStr} 月份記帳列`);
+                showToast(`成功建立 ${monthStr} 月份對照表！`);
                 setNewMonthVal(prev => prev === 12 ? 1 : prev + 1);
             };
 
             const handleReset = () => {
-                localStorage.clear();
-                window.location.reload();
+                try {
+                    localStorage.clear();
+                    window.location.reload();
+                } catch(e) {
+                    showToast('重置失敗', 'error');
+                }
             };
 
             const monthsData = useMemo(() => {
@@ -360,75 +387,75 @@
             }, [bills, cards]);
 
             return (
-                <div className="min-h-screen bg-slate-50 pb-12">
+                <div className="min-h-screen bg-slate-50 pb-16">
                     
-                    {/* 自訂安全 Modal */}
+                    {/* iOS 風格的確定重設對話框 */}
                     {showResetConfirm && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100">
-                                <h3 className="font-bold text-slate-900 text-base">確定要重設資料嗎？</h3>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                            <div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl border border-slate-100 text-center">
+                                <h3 className="font-bold text-slate-900 text-base">確認要清除資料嗎？</h3>
                                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                                    此動作將會清除手機本機端儲存的所有卡費紀錄與截止日，且無法復原。
+                                    此動作將會還原為最初的預設範例，您自己登錄的帳單紀錄與截止日會被完全清空。
                                 </p>
-                                <div className="mt-5 flex space-x-3 justify-end">
-                                    <button 
-                                        onClick={() => setShowResetConfirm(false)}
-                                        className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl"
-                                    >
-                                        取消
-                                    </button>
+                                <div className="mt-5 flex flex-col space-y-2">
                                     <button 
                                         onClick={handleReset}
-                                        className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-100"
+                                        className="w-full py-2.5 text-xs font-bold text-white bg-rose-600 active:bg-rose-700 rounded-xl active:scale-95 transition-transform"
                                     >
                                         確定重設
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowResetConfirm(false)}
+                                        className="w-full py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl"
+                                    >
+                                        取消
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 頂部導覽列 */}
-                    <header className="sticky top-0 z-40 bg-white/95 border-b border-slate-200 shadow-sm backdrop-blur-md pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3">
-                        <div className="max-w-4xl mx-auto px-4 flex flex-col items-center justify-between gap-3">
-                            <div className="flex items-center space-x-3 w-full justify-between">
+                    {/* App 頂部狀態列 */}
+                    <header className="sticky top-0 z-40 bg-white/95 border-b border-slate-200/80 shadow-sm backdrop-blur-md pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 px-4">
+                        <div className="max-w-md mx-auto flex flex-col items-center gap-2.5">
+                            <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center space-x-2.5">
-                                    <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-md shadow-indigo-100">
+                                    <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-md shadow-indigo-100 shrink-0">
                                         <CreditCardIcon className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <h1 className="text-lg font-bold tracking-tight text-slate-950 flex items-center gap-1.5">
-                                            卡費管家 <span className="text-[10px] bg-indigo-50 text-indigo-600 font-semibold px-2 py-0.5 rounded-full">iPhone Pro</span>
+                                        <h1 className="text-base font-bold tracking-tight text-slate-950 flex items-center gap-1.5">
+                                            卡費管家 <span className="text-[9px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">iPhone PWA</span>
                                         </h1>
-                                        <p className="text-[10px] text-slate-500">今日模擬：2026年5月21日</p>
+                                        <p className="text-[9px] text-slate-400">今日模擬：2026年5月21日</p>
                                     </div>
                                 </div>
                                 
                                 <button 
                                     onClick={() => setShowResetConfirm(true)} 
-                                    className="text-[10px] text-slate-400 hover:text-rose-500 font-medium px-2.5 py-1 rounded-lg border border-slate-200"
+                                    className="text-[10px] text-slate-400 font-medium px-2.5 py-1 rounded-lg border border-slate-200 active:scale-95 transition-transform shrink-0"
                                 >
                                     重置資料
                                 </button>
                             </div>
 
-                            {/* 分頁 Tab */}
-                            <div className="flex w-full bg-slate-100 p-1 rounded-xl border border-slate-200/60 mt-1">
+                            {/* 蘋果風精緻 Tab 分頁器 */}
+                            <div className="flex w-full bg-slate-100 p-1 rounded-xl border border-slate-200/60">
                                 <button 
                                     onClick={() => setActiveTab('dashboard')} 
-                                    className={`flex-1 py-2 text-center rounded-lg text-xs font-semibold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                                    className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all active:scale-95 ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
                                 >
                                     記帳提醒
                                 </button>
                                 <button 
                                     onClick={() => setActiveTab('settings')} 
-                                    className={`flex-1 py-2 text-center rounded-lg text-xs font-semibold transition-all ${activeTab === 'settings' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                                    className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all active:scale-95 ${activeTab === 'settings' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
                                 >
                                     通知與卡片
                                 </button>
                                 <button 
                                     onClick={() => setActiveTab('tips')} 
-                                    className={`flex-1 py-2 text-center rounded-lg text-xs font-semibold transition-all ${activeTab === 'tips' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                                    className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all active:scale-95 ${activeTab === 'tips' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
                                 >
                                     防忘記教學
                                 </button>
@@ -436,8 +463,8 @@
                         </div>
                     </header>
 
-                    {/* 主體內容 */}
-                    <main className="max-w-4xl mx-auto px-4 mt-4 space-y-4">
+                    {/* App 主畫面 */}
+                    <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
                         
                         {toast && (
                             <div className={`fixed top-4 left-4 right-4 z-50 flex items-center p-3.5 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-300 transform translate-y-0 ${
@@ -456,32 +483,32 @@
 
                         {activeTab === 'dashboard' && (
                             <>
-                                {/* 卡片快速摘要 */}
+                                {/* 卡片快速狀態展示區 */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase">本月未繳卡費</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">本月未繳總計</p>
                                         <p className="text-xl font-extrabold text-slate-900 mt-1">
                                             ${stats.totalUnpaid.toLocaleString()}
                                         </p>
-                                        <div className="text-[9px] text-slate-400 mt-1">含所有未繳項目</div>
+                                        <div className="text-[9px] text-slate-400 mt-1">累積未繳費總額</div>
                                     </div>
 
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
                                         <p className="text-[10px] font-bold text-rose-600 uppercase flex items-center gap-1">
                                             <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                                            嚴重逾期中
+                                            已逾期筆數
                                         </p>
                                         <p className="text-xl font-extrabold text-rose-600 mt-1">
                                             {stats.overdueCount} <span className="text-xs font-normal text-slate-400">筆</span>
                                         </p>
-                                        <div className="text-[9px] text-rose-500 mt-1 font-semibold">
-                                            {stats.overdueCount > 0 ? '⚠️ 中午將定時發送警示' : '🎉 安全無慮'}
+                                        <div className="text-[9px] text-rose-500 mt-1 font-bold">
+                                            {stats.overdueCount > 0 ? '⚠️ 中午將強制彈出推播' : '🎉 狀態一切安全'}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 中午通知功能快速控制面板 */}
-                                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-4 shadow-sm space-y-3">
+                                {/* 中午 12:00 自動巡檢核心控制區 */}
+                                <div className="bg-gradient-to-br from-indigo-50/60 to-blue-50/60 border border-indigo-100 rounded-2xl p-4 shadow-sm space-y-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center space-x-2">
                                             <span className="p-1.5 bg-indigo-100 rounded-lg text-indigo-600">
@@ -489,83 +516,83 @@
                                             </span>
                                             <div>
                                                 <h4 className="font-bold text-indigo-950 text-xs">
-                                                    中午 12:00 逾期每日通知
+                                                    中午 12:00 逾期提醒
                                                 </h4>
-                                                <p className="text-[10px] text-indigo-700">只要有未繳款，每天中午精準提醒</p>
+                                                <p className="text-[9px] text-indigo-700 font-medium">只要有逾期未繳，每天中午主動推播</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-[10px] text-slate-500">已啟用</span>
+                                        <div className="flex items-center space-x-2 shrink-0">
+                                            <span className="text-[9px] text-slate-500 font-bold">已開啟</span>
                                             <input 
                                                 type="checkbox" 
                                                 checked={isNoonReminderEnabled}
                                                 onChange={(e) => {
                                                     setIsNoonReminderEnabled(e.target.checked);
-                                                    showToast(e.target.checked ? '已開啟每日中午通知模式！' : '已關閉每日通知。');
+                                                    showToast(e.target.checked ? '已開啟每日中午巡檢！' : '已關閉每日中午通知功能。');
                                                 }}
-                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* 系統通知授權按鈕 */}
-                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-indigo-200/40">
-                                        <span className="text-[10px] text-slate-500">
-                                            系統通知權限狀態: <strong className="text-indigo-700">{notificationPermission === 'granted' ? '🟢 已允許' : '⚪ 未啟用'}</strong>
+                                    {/* 手動測試與授權按鈕 */}
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2.5 border-t border-indigo-200/40">
+                                        <span className="text-[9px] text-slate-500">
+                                            系統權限: <strong className="text-indigo-700">{notificationPermission === 'granted' ? '🟢 已授權' : '⚪ 尚未授權'}</strong>
                                         </span>
-                                        <div className="flex space-x-2 w-full sm:w-auto justify-end">
+                                        <div className="flex space-x-1.5 w-full justify-end">
                                             {notificationPermission !== 'granted' && (
                                                 <button
                                                     onClick={requestNotificationPermission}
-                                                    className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2.5 rounded-lg transition-colors"
+                                                    className="text-[9px] bg-indigo-600 text-white font-bold py-1 px-2.5 rounded-lg active:scale-95 transition-transform"
                                                 >
                                                     啟用 iPhone 系統通知權限
                                                 </button>
                                             )}
                                             <button
                                                 onClick={simulateNoonCheck}
-                                                className="text-[10px] bg-white hover:bg-slate-50 text-slate-700 font-bold py-1 px-2.5 rounded-lg border border-slate-200 transition-colors"
+                                                className="text-[9px] bg-white text-slate-700 font-bold py-1 px-2.5 rounded-lg border border-slate-200 active:scale-95 transition-transform shadow-sm"
                                             >
-                                                ⚡ 模擬測試中午 12:00 檢查
+                                                ⚡ 模擬中午對帳測試
                                             </button>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 每月警戒提醒區 */}
+                                {/* 5 號固定警戒提醒框 */}
                                 {TODAY.getDate() >= alertDayOfMonth && stats.totalUnpaid > 0 && (
-                                    <div className="bg-amber-50/90 border-l-4 border-amber-500 rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                                    <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
                                         <span className="p-1.5 bg-amber-100 rounded-lg text-amber-600 shrink-0 mt-0.5">
                                             <AlertIcon className="w-4 h-4" />
                                         </span>
                                         <div>
                                             <h4 className="font-bold text-amber-950 text-xs">
-                                                🚨 提醒：今天已過每月 {alertDayOfMonth} 日對帳警戒線！
+                                                🚨 注意：今日已過每月 {alertDayOfMonth} 號對帳日！
                                             </h4>
                                             <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
-                                                目前還有 <span className="font-bold text-rose-600">${stats.totalUnpaid.toLocaleString()}</span> 元卡費未標記為「已繳清」。為防逾期，每天中午將會持續向您發送手機系統推播，直到您點擊「標記已繳」為止！
+                                                目前仍有卡費尚未核銷。為避免逾期，在您將款項點選並標記為<strong>「已繳清」</strong>之前，App 中午將會持續提示，請儘速繳納！
                                             </p>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* 主要記帳列表 */}
+                                {/* 主要對帳卡片矩陣 */}
                                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                                     <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                                         <div>
-                                            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                            <h2 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
                                                 <CalendarIcon className="text-indigo-600 w-4 h-4" />
-                                                我的卡費登錄矩陣
+                                                應繳金額登錄區
                                             </h2>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">點擊「金額」修改，點擊「按鈕」切換已繳。</p>
+                                            <p className="text-[9px] text-slate-400 mt-0.5">點擊金額可修改數值，點按鈕快速變更已繳狀態。</p>
                                         </div>
 
-                                        {/* 增加月份 */}
-                                        <div className="flex items-center gap-1">
+                                        {/* 下拉新增月份 */}
+                                        <div className="flex items-center gap-1 shrink-0">
                                             <select 
                                                 value={newMonthVal} 
                                                 onChange={(e) => setNewMonthVal(parseInt(e.target.value))}
-                                                className="bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold p-1 text-slate-700"
+                                                className="bg-slate-100 border border-slate-200 rounded-lg text-[9px] font-bold p-1 text-slate-700 focus:outline-none"
                                             >
                                                 {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
                                                     <option key={m} value={m}>{m}月</option>
@@ -573,19 +600,20 @@
                                             </select>
                                             <button
                                                 onClick={addNewMonthRow}
-                                                className="p-1 bg-indigo-600 text-white rounded-lg"
+                                                className="p-1.5 bg-indigo-600 text-white rounded-lg active:scale-95 transition-transform"
+                                                title="新增月份行"
                                             >
                                                 <PlusIcon className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* 卡片式的帳單條目 (手機優化) */}
+                                    {/* 手機單手優化：卡片折疊清單 */}
                                     <div className="divide-y divide-slate-100">
                                         {monthsData.map(({ month, rowBills }) => (
-                                            <div key={month} className="p-4 space-y-3 bg-slate-50/20 hover:bg-slate-50/50 transition-colors">
+                                            <div key={month} className="p-4 space-y-3 bg-slate-50/20 hover:bg-slate-50/40 transition-colors">
                                                 <div className="text-xs font-extrabold text-indigo-900 bg-indigo-50 w-fit px-2 py-0.5 rounded-md">
-                                                    {month} 月份帳單
+                                                    {month} 月份卡費對帳
                                                 </div>
 
                                                 <div className="grid grid-cols-2 gap-3">
@@ -598,8 +626,8 @@
                                                         return (
                                                             <div key={card.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-2">
                                                                 <div className="flex items-center justify-between">
-                                                                    <span className="text-xs font-bold text-slate-800">{card.name}</span>
-                                                                    <span className="text-[9px] text-slate-400">{card.dueDate}號截止</span>
+                                                                    <span className="text-xs font-black text-slate-800">{card.name}</span>
+                                                                    <span className="text-[9px] text-slate-400 font-semibold">{card.dueDate}日止</span>
                                                                 </div>
 
                                                                 <div className="py-1">
@@ -609,14 +637,14 @@
                                                                                 type="number"
                                                                                 value={editValue}
                                                                                 onChange={(e) => setEditValue(e.target.value)}
-                                                                                className="w-full px-1.5 py-0.5 text-xs font-bold border border-indigo-400 rounded-md bg-white text-center"
+                                                                                className="w-full px-1.5 py-0.5 text-xs font-bold border border-indigo-400 rounded-md bg-white text-center focus:outline-none"
                                                                                 autoFocus
                                                                             />
                                                                             <button
                                                                                 onClick={() => handleSaveAmount(bill.id)}
-                                                                                className="px-1.5 py-0.5 bg-indigo-600 text-white rounded-md text-[9px] font-bold shrink-0"
+                                                                                className="px-2 py-0.5 bg-indigo-600 text-white rounded-md text-[9px] font-bold shrink-0"
                                                                             >
-                                                                                儲存
+                                                                                確認
                                                                             </button>
                                                                         </div>
                                                                     ) : (
@@ -625,8 +653,8 @@
                                                                                 setEditingCell(bill.id);
                                                                                 setEditValue(bill.amount.toString());
                                                                             }}
-                                                                            className="text-sm font-black text-slate-900 cursor-pointer py-0.5 px-1 bg-slate-50 rounded text-center hover:bg-slate-100 border border-dashed border-slate-200"
-                                                                            title="點擊修改金額"
+                                                                            className="text-xs font-extrabold text-slate-900 cursor-pointer py-1 px-1 bg-slate-50 rounded text-center hover:bg-slate-100 border border-dashed border-slate-200"
+                                                                            title="點擊編輯應繳金額"
                                                                         >
                                                                             ${bill.amount.toLocaleString()}
                                                                         </div>
@@ -634,19 +662,19 @@
                                                                 </div>
 
                                                                 <div className="space-y-1.5">
-                                                                    <div className={`text-[9px] font-bold py-0.5 rounded-md text-center border ${status.color}`}>
+                                                                    <div className={`text-[8px] font-extrabold py-0.5 rounded-md text-center border ${status.color}`}>
                                                                         {status.text}
                                                                     </div>
                                                                     {bill.amount > 0 && (
                                                                         <button
                                                                             onClick={() => togglePaid(bill.id)}
-                                                                            className={`w-full py-1 text-[9px] font-bold rounded-lg transition-all border ${
+                                                                            className={`w-full py-1 text-[9px] font-bold rounded-lg transition-all border active:scale-95 ${
                                                                                 bill.isPaid 
-                                                                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-500 border-slate-200' 
-                                                                                    : 'bg-emerald-600 text-white border-transparent shadow-sm hover:bg-emerald-700'
+                                                                                    ? 'bg-slate-100 text-slate-500 border-slate-200' 
+                                                                                    : 'bg-emerald-600 text-white border-transparent shadow-sm'
                                                                             }`}
                                                                         >
-                                                                            {bill.isPaid ? '回復為未繳' : '標記已繳清'}
+                                                                            {bill.isPaid ? '回復為未繳' : '一鍵標記已繳'}
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -666,66 +694,66 @@
                                 <div className="border-b border-slate-100 pb-4 space-y-3">
                                     <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                         <BellIcon className="text-indigo-600 animate-pulse" />
-                                        iPhone 系統通知推播整合設定
+                                        iOS 系統推播設定
                                     </h3>
                                     
                                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="text-slate-600">自動重複模式：</span>
-                                            <span className="font-bold text-indigo-600">每天中午 12:00（僅逾期時提醒）</span>
+                                            <span className="text-slate-600 font-medium">每天對帳時間：</span>
+                                            <span className="font-extrabold text-indigo-600">中午 12:00</span>
                                         </div>
                                         <p className="text-[10px] text-slate-500 leading-relaxed">
-                                            開啟後，每天中午系統會默默巡檢。若查到有<strong>「已逾期」</strong>帳單未繳，且尚未點擊「已繳清」時，手機系統頂部會立即跳出橫幅推播、震動，直到您繳款並回程式登記為止。
+                                            開啟後，系統若在中午檢查到任何一張卡費「已過截止日」卻「尚未繳清」，會立刻向您的 iPhone 鎖定畫面發出警告。
                                         </p>
 
-                                        <div className="pt-2 flex items-center space-x-4">
-                                            <label className="flex items-center space-x-1.5 text-xs text-slate-700 font-bold">
+                                        <div className="pt-1.5 flex items-center space-x-4">
+                                            <label className="flex items-center space-x-1.5 text-xs text-slate-700 font-bold cursor-pointer">
                                                 <input
                                                     type="radio"
                                                     checked={isNoonReminderEnabled === true}
                                                     onChange={() => setIsNoonReminderEnabled(true)}
                                                     className="rounded"
                                                 />
-                                                <span>開啟中午提醒</span>
+                                                <span>開啟提醒</span>
                                             </label>
-                                            <label className="flex items-center space-x-1.5 text-xs text-slate-700">
+                                            <label className="flex items-center space-x-1.5 text-xs text-slate-700 font-bold cursor-pointer">
                                                 <input
                                                     type="radio"
                                                     checked={isNoonReminderEnabled === false}
                                                     onChange={() => setIsNoonReminderEnabled(false)}
                                                     className="rounded"
                                                 />
-                                                <span>暫停中午提醒</span>
+                                                <span>關閉提醒</span>
                                             </label>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 新增：字體大小調節拉桿區 */}
+                                {/* iPhone 特色：字體大小拖動拉桿 */}
                                 <div className="border-b border-slate-100 pb-4 space-y-3">
                                     <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                         <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                                         </svg>
-                                        A⁺ 介面字體大小放大拉桿
+                                        A⁺ 手機介面字體大小無級縮放
                                     </h3>
                                     
                                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs text-slate-500">目前比例：<strong className="text-indigo-600">{fontSizeScale}%</strong></span>
+                                            <span className="text-xs text-slate-500">目前尺寸比例：<strong className="text-indigo-600">{fontSizeScale}%</strong></span>
                                             <button 
                                                 onClick={() => {
                                                     setFontSizeScale(100);
-                                                    showToast('已恢復預設 100% 字體大小！');
+                                                    showToast('字體比例已恢復為預設的 100%');
                                                 }}
-                                                className="text-[10px] bg-white border border-slate-200 text-slate-600 font-semibold px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                                                className="text-[9px] bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
                                             >
-                                                重設回預設 (100%)
+                                                重設回預設
                                             </button>
                                         </div>
                                         
-                                        <div className="flex items-center space-x-3.5">
-                                            <span className="text-xs font-medium text-slate-400">A- (小)</span>
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-[10px] font-bold text-slate-400">Aa (小)</span>
                                             <input 
                                                 type="range" 
                                                 min="80" 
@@ -735,10 +763,10 @@
                                                 onChange={(e) => setFontSizeScale(parseInt(e.target.value))}
                                                 className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                             />
-                                            <span className="text-sm font-bold text-slate-700">A+ (大)</span>
+                                            <span className="text-xs font-black text-slate-700">Aa (大)</span>
                                         </div>
-                                        <p className="text-[10px] text-slate-400 leading-snug">
-                                            💡 提示：此拉桿支援實時縮放。若您覺得手機畫面字太小，可以直接拉到 120% ~ 140% 獲得最清晰舒適的閱讀觀看體驗！
+                                        <p className="text-[9px] text-slate-400 leading-snug">
+                                            💡 提示：如果覺得預設的文字太小，可以用手指拖動上方拉桿，整個 App 畫面上的字體將會立刻按比例同步完美放大。
                                         </p>
                                     </div>
                                 </div>
@@ -746,21 +774,20 @@
                                 <div>
                                     <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                                         <CreditCardIcon className="text-indigo-600" />
-                                        信用卡截止日維護
+                                        卡片基本截止日變更
                                     </h2>
-                                    <p className="text-[10px] text-slate-400">變更後，帳單倒數的天數會自動重新計算。</p>
                                 </div>
 
                                 <div className="space-y-3">
                                     {cards.map((card, index) => (
                                         <div key={card.id} className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 flex items-center justify-between">
                                             <div>
-                                                <h4 className="text-xs font-bold text-slate-900">{card.name}</h4>
-                                                <p className="text-[9px] text-slate-400">{card.billCycle}</p>
+                                                <h4 className="text-xs font-bold text-slate-950">{card.name}</h4>
+                                                <p className="text-[9px] text-slate-400 font-medium">{card.billCycle}</p>
                                             </div>
 
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-[10px] text-slate-500">截止日:</span>
+                                            <div className="flex items-center space-x-1.5 shrink-0">
+                                                <span className="text-[10px] text-slate-500">截止繳款日:</span>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -770,7 +797,7 @@
                                                         const val = Math.min(31, Math.max(1, parseInt(e.target.value) || 1));
                                                         setCards(prev => prev.map((c, i) => i === index ? { ...c, dueDate: val } : c));
                                                     }}
-                                                    className="w-12 p-1 text-xs text-center bg-white border border-slate-200 rounded-lg font-bold"
+                                                    className="w-12 p-1 text-xs text-center bg-white border border-slate-200 rounded-lg font-black focus:outline-none"
                                                 />
                                                 <span className="text-[10px] text-slate-500">號</span>
                                             </div>
@@ -778,15 +805,15 @@
                                     ))}
                                 </div>
 
-                                <div className="border-t border-slate-100 pt-4 space-y-3">
-                                    <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <div className="border-t border-slate-100 pt-4 space-y-3.5">
+                                    <h3 className="text-xs font-bold text-slate-950 flex items-center gap-1.5">
                                         <BellIcon className="text-indigo-600" />
-                                        防忘記警戒參數設定
+                                        防逾期警戒參數
                                     </h3>
 
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                                            📅 每月對帳「警告截止日」（預設：每月的 5 號）
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                            📅 每月強制對帳警戒日（預設每月的 5 號）
                                         </label>
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-xs">每月的</span>
@@ -798,20 +825,20 @@
                                                 onChange={(e) => {
                                                     const val = Math.min(31, Math.max(1, parseInt(e.target.value) || 1));
                                                     setAlertDayOfMonth(val);
-                                                    showToast(`已更新警戒日為每月 ${val} 號！`);
+                                                    showToast(`已成功變更警戒檢查日為每月 ${val} 號`);
                                                 }}
-                                                className="w-14 p-1.5 text-xs text-center border border-slate-200 rounded-lg font-extrabold text-indigo-600 bg-slate-50"
+                                                className="w-14 p-1 text-xs text-center border border-slate-200 rounded-lg font-black text-indigo-600 bg-slate-50 focus:outline-none"
                                             />
-                                            <span className="text-xs">號 (過此日若有未繳，首頁與中午會強制警示)</span>
+                                            <span className="text-xs">號</span>
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                                            ⏰ 截止日前幾天開始「黃色警告」？
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                            ⏰ 截止日前幾天起開始顯示黃色警告？
                                         </label>
-                                        <div className="flex items-center gap-4 mt-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                            <label className="flex items-center space-x-1.5 text-xs">
+                                        <div className="flex items-center gap-4 mt-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                            <label className="flex items-center space-x-1.5 text-xs font-medium cursor-pointer">
                                                 <input
                                                     type="radio"
                                                     name="daysbefore"
@@ -821,7 +848,7 @@
                                                 />
                                                 <span>3 天前</span>
                                             </label>
-                                            <label className="flex items-center space-x-1.5 text-xs">
+                                            <label className="flex items-center space-x-1.5 text-xs font-medium cursor-pointer">
                                                 <input
                                                     type="radio"
                                                     name="daysbefore"
@@ -844,7 +871,7 @@
                                         <LightBulbIcon className="text-amber-500 w-4 h-4" />
                                         iPhone 專屬：如何設定中午 12:00 自動通知提醒？
                                     </h2>
-                                    <p className="text-[10px] text-slate-400">只要透過 iOS 內建的「捷徑」App，即可免費實現 100% 穩定的中午逾期警告。</p>
+                                    <p className="text-[9px] text-slate-400">只要透過 iOS 內建的「捷徑」App，即可免費實現 100% 穩定的中午逾期警告。</p>
                                 </div>
 
                                 <div className="space-y-3">
@@ -863,14 +890,14 @@
                                         <ol className="list-decimal list-inside text-[11px] text-slate-600 space-y-1.5 leading-relaxed">
                                             <li>打開 iPhone 內建的「<strong>捷徑 (Shortcuts)</strong>」App。</li>
                                             <li>切換到下方的「<strong>自動化 (Automation)</strong>」分頁，點選右上角「+」或「製作個人自動化」。</li>
-                                            <li>選擇「<strong>特定時間 (Time of Day)</strong>」，設定為「<strong>12:00 PM (中午)</strong>」，重複點選「<strong>每天</strong>」。下方勾選「<strong>立即執行 (Run Immediately)</strong>」，然後按下一步。</li>
+                                            <li>選擇「<strong>特定時間 (Time of Day)</strong>」，設定為「<strong>12:00 PM (中午)</strong>」，重複點選「<strong>每天</strong>」。下方勾選「<strong>立即執行 (Run Immediately)</strong>防忘」，然後按下一步。</li>
                                             <li>點擊「<strong>新增空白自動化</strong>」或「加入動作」，在搜尋框搜尋「<strong>打開 App (Open App)</strong>」。</li>
                                             <li>在「打開」右側點選 App，從清單中選擇剛剛加入主畫面的「<strong>卡費管家</strong>」。</li>
                                             <li>點選右上角「<strong>完成</strong>」儲存！</li>
                                         </ol>
                                     </div>
 
-                                    <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-[11px] text-amber-950 leading-relaxed">
+                                    <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-[10px] text-amber-950 leading-relaxed">
                                         🎉 <strong>設定完成的效果：</strong><br />
                                         每天中午 12:00，iPhone 會全自動開啟本 App。App 一經啟動，就會立刻在背景執行對帳檢查。<strong>如果發現您的永豐或富邦卡費已逾期未繳，手機頂部會瞬間震動並彈出警告通知！</strong>如果今天全部都已經繳清了，App 就會保持安靜不打擾您。
                                     </div>
