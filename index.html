@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -38,7 +37,7 @@
 <body class="bg-slate-50 text-slate-800 antialiased select-none">
     <div id="root"></div>
 
-    <!-- 註冊 Service Worker：這是讓 iPhone「捷徑」能找到 App 並發送通知的關鍵技術 -->
+    <!-- 註冊 Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -100,6 +99,12 @@
             </svg>
         );
 
+        const CloudIcon = ({ className = "w-5 h-5" }) => (
+            <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+            </svg>
+        );
+
         // 安全地讀取 LocalStorage
         const safeGetItem = (key, defaultValue) => {
             try {
@@ -124,9 +129,11 @@
             // 固定模擬時間：2026 年 5 月 21 日
             const TODAY = useMemo(() => new Date(2026, 4, 21), []); // 4 代表 5 月
 
+            // 【精準同步真實卡片資訊】
+            // 將富邦預設修改為：每月 2 日結帳，18 日截止繳款
             const [cards, setCards] = useState(() => safeGetItem('reminder_cards', [
                 { id: 'sinopac', name: '永豐銀行', dueDate: 15, billCycle: '每月25日結帳', color: 'indigo' },
-                { id: 'fubon', name: '富邦銀行', dueDate: 25, billCycle: '每月5日結帳', color: 'blue' }
+                { id: 'fubon', name: '富邦銀行', dueDate: 18, billCycle: '每月2日結帳', color: 'blue' }
             ]));
 
             const [bills, setBills] = useState(() => safeGetItem('reminder_bills', [
@@ -138,26 +145,18 @@
                 { id: '6', cardId: 'fubon', year: 2026, month: 7, amount: 0, isPaid: false }
             ]));
 
-            const [alertDayOfMonth, setAlertDayOfMonth] = useState(() => {
-                const saved = safeGetItem('reminder_alert_day', 5);
-                return saved;
-            });
+            const [alertDayOfMonth, setAlertDayOfMonth] = useState(() => safeGetItem('reminder_alert_day', 5));
+            const [remindDaysBefore, setRemindDaysBefore] = useState(() => safeGetItem('reminder_days_before', 3));
+            const [isNoonReminderEnabled, setIsNoonReminderEnabled] = useState(() => safeGetItem('reminder_noon_enabled', true));
+            const [fontSizeScale, setFontSizeScale] = useState(() => safeGetItem('reminder_font_size_scale', 100));
 
-            const [remindDaysBefore, setRemindDaysBefore] = useState(() => {
-                const saved = safeGetItem('reminder_days_before', 3);
-                return saved;
+            // Gmail GAS 雲端對接網址
+            const [gasUrl, setGasUrl] = useState(() => {
+                try {
+                    return localStorage.getItem('reminder_gas_url') || '';
+                } catch(e) { return ''; }
             });
-
-            const [isNoonReminderEnabled, setIsNoonReminderEnabled] = useState(() => {
-                const saved = safeGetItem('reminder_noon_enabled', true);
-                return saved;
-            });
-
-            // 介面字體大小縮放比例 (80 - 150)
-            const [fontSizeScale, setFontSizeScale] = useState(() => {
-                const saved = safeGetItem('reminder_font_size_scale', 100);
-                return saved;
-            });
+            const [isSyncing, setIsSyncing] = useState(false);
 
             const [notificationPermission, setNotificationPermission] = useState('default');
             const [editingCell, setEditingCell] = useState(null);
@@ -173,8 +172,13 @@
             useEffect(() => { safeSetItem('reminder_alert_day', alertDayOfMonth); }, [alertDayOfMonth]);
             useEffect(() => { safeSetItem('reminder_days_before', remindDaysBefore); }, [remindDaysBefore]);
             useEffect(() => { safeSetItem('reminder_noon_enabled', isNoonReminderEnabled); }, [isNoonReminderEnabled]);
+            useEffect(() => {
+                try {
+                    localStorage.setItem('reminder_gas_url', gasUrl);
+                } catch(e) {}
+            }, [gasUrl]);
 
-            // 當字體大小改變時，調整 HTML 根節點的字體尺寸以達到無級全螢幕縮放
+            // 監聽字體大小改變並直接寫入 HTML 根節點以實現放大拉桿
             useEffect(() => {
                 safeSetItem('reminder_font_size_scale', fontSizeScale);
                 document.documentElement.style.fontSize = `${fontSizeScale}%`;
@@ -191,21 +195,89 @@
                 setTimeout(() => setToast(null), 3500);
             };
 
-            // 【核心安全升級：逆向防漏狀態判定】
+            // 雲端資料同步函數
+            const syncWithCloud = async (forceTriggerAlert = false, autoMergeData = null) => {
+                if (!gasUrl) {
+                    if (forceTriggerAlert) showToast('請先至設定分頁貼上您的 Google 部署網址喔！', 'warning');
+                    return;
+                }
+                setIsSyncing(true);
+                try {
+                    if (autoMergeData) {
+                        await fetch(gasUrl, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'saveBills', bills: autoMergeData })
+                        });
+                        setBills(autoMergeData);
+                        setIsSyncing(false);
+                        return;
+                    }
+
+                    const response = await fetch(gasUrl, { method: 'GET', redirect: 'follow' });
+                    if (response.ok) {
+                        const cloudBills = await response.json();
+                        if (Array.isArray(cloudBills) && cloudBills.length > 0) {
+                            const mergedBills = bills.map(localBill => {
+                                const cloudMatched = cloudBills.find(cb => cb.cardId === localBill.cardId && cb.month === localBill.month && cb.year === localBill.year);
+                                if (cloudMatched) {
+                                    return {
+                                        ...localBill,
+                                        amount: cloudMatched.amount !== undefined ? cloudMatched.amount : localBill.amount,
+                                        isPaid: localBill.isPaid
+                                    };
+                                }
+                                return localBill;
+                            });
+
+                            cloudBills.forEach(cb => {
+                                const exist = mergedBills.some(lb => lb.cardId === cb.cardId && lb.month === cb.month && lb.year === cb.year);
+                                if (!exist) {
+                                    mergedBills.push(cb);
+                                }
+                            });
+
+                            setBills(mergedBills);
+                            safeSetItem('reminder_bills', mergedBills);
+                            if (forceTriggerAlert) showToast('⚡ 與 Gmail 帳單同步完成！金額已自動登錄！');
+                        } else {
+                            await fetch(gasUrl, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'saveBills', bills: bills })
+                            });
+                            if (forceTriggerAlert) showToast('☁️ 雲端同步初始化成功！');
+                        }
+                    } else {
+                        throw new Error('Sync failed');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    if (forceTriggerAlert) showToast('❌ 同步失敗，請確認您的部署網址是否正確並開啟了權限。', 'warning');
+                }
+                setIsSyncing(false);
+            };
+
+            useEffect(() => {
+                if (gasUrl) {
+                    syncWithCloud(false);
+                }
+            }, [gasUrl]);
+
+            // 【逆向防漏狀態判定】
             const getBillStatus = (bill, card) => {
-                // 情境 1: 已標記處理
                 if (bill.isPaid) {
                     if (bill.amount === 0) {
-                        return { code: 'NO_SPENDING', text: '🟢 本月無消費', color: 'text-slate-500 bg-slate-100 border-slate-200', daysLeft: null };
+                        return { code: 'NO_SPENDING', text: '🟢 本月無消費', color: 'text-slate-505 bg-slate-100 border-slate-200', daysLeft: null };
                     }
                     return { code: 'PAID', text: '🟢 已繳清', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', daysLeft: null };
                 }
 
-                // 判斷該帳單月份是否已經到來（比今天模擬的 5/21 早或相同）
                 const isBillMonthArrived = (bill.year < TODAY.getFullYear()) || 
                                            (bill.year === TODAY.getFullYear() && bill.month <= (TODAY.getMonth() + 1));
 
-                // 情境 2: 時間到了，但金額卻維持 0 且「未核銷」➡️ 判定為【待確認帳單】
                 if (bill.amount === 0 && isBillMonthArrived) {
                     return { 
                         code: 'UNCONFIRMED', 
@@ -215,12 +287,10 @@
                     };
                 }
 
-                // 情境 3: 未來的月份，且未開單，此時顯示灰色安全狀態
                 if (bill.amount === 0) {
                     return { code: 'EMPTY', text: '未開期', color: 'text-gray-400 bg-gray-50 border-gray-200', daysLeft: null };
                 }
 
-                // 情境 4: 正常的應繳金額倒數
                 const dueDateObj = new Date(bill.year, bill.month - 1, card.dueDate);
                 const diffTime = dueDateObj - TODAY;
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -253,7 +323,7 @@
                 let totalUnpaid = 0;
                 let overdueCount = 0;
                 let upcomingCount = 0;
-                let unconfirmedCount = 0; // 新增：待確認帳單計數
+                let unconfirmedCount = 0;
                 const alertList = [];
 
                 bills.forEach(bill => {
@@ -301,7 +371,7 @@
                 return false;
             };
 
-            // 捷徑定時自動巡檢檢查：包含「逾期未繳」與「待確認帳單」
+            // 捷徑定時自動巡檢檢查
             const hasAutoChecked = useRef(false);
             useEffect(() => {
                 if (hasAutoChecked.current) return;
@@ -312,39 +382,47 @@
                 if (isFromShortcut && isNoonReminderEnabled) {
                     hasAutoChecked.current = true;
                     const timer = setTimeout(() => {
-                        const hasOverdue = stats.overdueCount > 0;
-                        const hasUnconfirmed = stats.unconfirmedCount > 0;
+                        const performCheck = () => {
+                            const hasOverdue = stats.overdueCount > 0;
+                            const hasUnconfirmed = stats.unconfirmedCount > 0;
 
-                        if (hasOverdue || hasUnconfirmed) {
-                            let title = '🚨 卡費防漏警戒提醒！';
-                            let body = '';
+                            if (hasOverdue || hasUnconfirmed) {
+                                let title = '🚨 卡費防漏警戒提醒！';
+                                let body = '';
 
-                            if (hasOverdue) {
-                                const overdueDetails = stats.alertList
-                                    .filter(item => item.status.code === 'OVERDUE')
-                                    .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
-                                    .join(', ');
-                                body += `您有 ${stats.overdueCount} 筆卡費已逾期 (${overdueDetails})！`;
+                                if (hasOverdue) {
+                                    const overdueDetails = stats.alertList
+                                        .filter(item => item.status.code === 'OVERDUE')
+                                        .map(item => `【${item.card.name}】$${item.bill.amount.toLocaleString()}`)
+                                        .join(', ');
+                                    body += `您有 ${stats.overdueCount} 筆卡費已逾期 (${overdueDetails})！`;
+                                }
+
+                                if (hasUnconfirmed) {
+                                    const unconfirmedDetails = stats.alertList
+                                        .filter(item => item.status.code === 'UNCONFIRMED')
+                                        .map(item => `【${item.card.name} ${item.bill.month}月】`)
+                                        .join(', ');
+                                    if (body) body += ' 另外，';
+                                    body += `發現未確認帳單 ${unconfirmedDetails}，請上網銀確認金額或標記「無消費」！`;
+                                }
+                                
+                                triggerNativeNotification(title, body);
+                                showToast('🔔 捷徑對帳：已自動發送系統提醒！');
+                            } else {
+                                showToast('☕ 捷徑對帳：巡檢完成，所有卡費均已核銷清空。', 'success');
                             }
+                        };
 
-                            if (hasUnconfirmed) {
-                                const unconfirmedDetails = stats.alertList
-                                    .filter(item => item.status.code === 'UNCONFIRMED')
-                                    .map(item => `【${item.card.name} ${item.bill.month}月】`)
-                                    .join(', ');
-                                if (body) body += ' 另外，';
-                                body += `發現未確認帳單 ${unconfirmedDetails}，請上網銀確認金額或標記「無消費」！`;
-                            }
-                            
-                            triggerNativeNotification(title, body);
-                            showToast('🔔 捷徑對帳：已自動發送系統提醒！');
+                        if (gasUrl) {
+                            syncWithCloud(false).then(() => performCheck());
                         } else {
-                            showToast('☕ 捷徑對帳：巡檢完成，所有卡費均已核銷清空。', 'success');
+                            performCheck();
                         }
                     }, 1200);
                     return () => clearTimeout(timer);
                 }
-            }, [stats.overdueCount, stats.unconfirmedCount, isNoonReminderEnabled]);
+            }, [stats.overdueCount, stats.unconfirmedCount, isNoonReminderEnabled, gasUrl]);
 
             const requestNotificationPermission = async () => {
                 if (!('Notification' in window)) {
@@ -366,7 +444,6 @@
                 }
             };
 
-            // 手動對帳測試
             const simulateNoonCheck = () => {
                 if (!isNoonReminderEnabled) {
                     showToast('您已在設定中關閉了自動提醒。', 'info');
@@ -414,31 +491,49 @@
                     showToast('請輸入正確的金額數字', 'error');
                     return;
                 }
-                setBills(prev => prev.map(b => b.id === billId ? { ...b, amount: numVal, isPaid: false } : b));
+                const updated = bills.map(b => b.id === billId ? { ...b, amount: numVal, isPaid: false } : b);
                 setEditingCell(null);
-                showToast('帳單金額已更新並安全儲存！ 💾');
+                
+                if (gasUrl) {
+                    syncWithCloud(false, updated);
+                    showToast('帳單金額已更新，並成功同步至雲端！ ☁️');
+                } else {
+                    setBills(updated);
+                    showToast('帳單金額已更新並安全儲存在本地！ 💾');
+                }
             };
 
             const togglePaid = (billId) => {
-                setBills(prev => prev.map(b => {
+                const updated = bills.map(b => {
                     if (b.id === billId) {
                         const nextState = !b.isPaid;
                         showToast(nextState ? '🎉 已標記為已繳清！中午不會再跳出通知了。' : '帳單已被設定回未繳狀態。', nextState ? 'success' : 'info');
                         return { ...b, isPaid: nextState };
                     }
                     return b;
-                }));
+                });
+
+                if (gasUrl) {
+                    syncWithCloud(false, updated);
+                } else {
+                    setBills(updated);
+                }
             };
 
-            // 新功能：一鍵確認本月無消費（安全核銷）
             const markAsNoSpending = (billId) => {
-                setBills(prev => prev.map(b => {
+                const updated = bills.map(b => {
                     if (b.id === billId) {
                         showToast('👌 已確認此期無消費，警報解除！');
                         return { ...b, amount: 0, isPaid: true };
                     }
                     return b;
-                }));
+                });
+
+                if (gasUrl) {
+                    syncWithCloud(false, updated);
+                } else {
+                    setBills(updated);
+                }
             };
 
             const addNewMonthRow = () => {
@@ -458,7 +553,12 @@
                     isPaid: false
                 }));
 
-                setBills(prev => [...prev, ...newBills]);
+                const updated = [...bills, ...newBills];
+                if (gasUrl) {
+                    syncWithCloud(false, updated);
+                } else {
+                    setBills(updated);
+                }
                 showToast(`成功建立 ${monthStr} 月份對照表！`);
                 setNewMonthVal(prev => prev === 12 ? 1 : prev + 1);
             };
@@ -528,12 +628,24 @@
                                     </div>
                                 </div>
                                 
-                                <button 
-                                    onClick={() => setShowResetConfirm(true)} 
-                                    className="text-[10px] text-slate-400 font-medium px-2.5 py-1 rounded-lg border border-slate-200 active:scale-95 transition-transform shrink-0"
-                                >
-                                    重置資料
-                                </button>
+                                <div className="flex items-center space-x-1.5 shrink-0">
+                                    {gasUrl && (
+                                        <button 
+                                            onClick={() => syncWithCloud(true)}
+                                            disabled={isSyncing}
+                                            className="text-[10px] text-indigo-600 font-bold px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 flex items-center gap-1 active:scale-95 transition-transform"
+                                        >
+                                            <CloudIcon className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                                            {isSyncing ? '同步中' : '同步 Gmail'}
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => setShowResetConfirm(true)} 
+                                        className="text-[10px] text-slate-400 font-medium px-2.5 py-1 rounded-lg border border-slate-200 active:scale-95 transition-transform"
+                                    >
+                                        重置
+                                    </button>
+                                </div>
                             </div>
 
                             {/* 蘋果風精緻 Tab 分頁器 */}
@@ -583,11 +695,13 @@
                                 {/* 卡片快速狀態展示區 */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">本月未繳總計</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">本期未繳總計</p>
                                         <p className="text-xl font-extrabold text-slate-900 mt-1">
                                             ${stats.totalUnpaid.toLocaleString()}
                                         </p>
-                                        <div className="text-[9px] text-slate-400 mt-1">累積確認應繳金額</div>
+                                        <div className="text-[9px] text-slate-400 mt-1 flex items-center gap-1">
+                                            {gasUrl ? '☁️ 雲端同步中' : '💾 本機儲存中'}
+                                        </div>
                                     </div>
 
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
@@ -599,7 +713,7 @@
                                             {(stats.overdueCount + stats.unconfirmedCount)} <span className="text-xs font-normal text-slate-400">筆</span>
                                         </p>
                                         <div className="text-[9px] text-amber-600 mt-1 font-bold">
-                                            {stats.unconfirmedCount > 0 ? '⚠️ 存在未核對帳單！' : '🎉 所有帳單均已掌握'}
+                                            {stats.unconfirmedCount > 0 ? '⚠️ 存在未核對帳單！' : '🎉 狀態一切安全'}
                                         </div>
                                     </div>
                                 </div>
@@ -643,14 +757,14 @@
                                                     onClick={requestNotificationPermission}
                                                     className="text-[9px] bg-indigo-600 text-white font-bold py-1 px-2.5 rounded-lg active:scale-95 transition-transform"
                                                 >
-                                                    啟用 iPhone 系統通知權限
+                                                    啟用通知權限
                                                 </button>
                                             )}
                                             <button
                                                 onClick={simulateNoonCheck}
                                                 className="text-[9px] bg-white text-slate-700 font-bold py-1 px-2.5 rounded-lg border border-slate-200 active:scale-95 transition-transform shadow-sm"
                                             >
-                                                ⚡ 模擬中午對帳測試
+                                                ⚡ 模擬對帳測試
                                             </button>
                                         </div>
                                     </div>
@@ -667,7 +781,7 @@
                                                 🚨 注意：今日已過每月 {alertDayOfMonth} 號對帳日！
                                             </h4>
                                             <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
-                                                系統發現您有未繳清的卡費，或有<strong>未確認登錄金額</strong>的卡片。為了確保不漏繳，請確認金額或標記為「無消費」，否則中午將持續提醒您。
+                                                系統發現您有未繳清的卡費，或有<strong>未確認登錄金額</strong>的卡片。若您有收到電子郵件帳單，請按下上方 **「同步 Gmail」** 按鈕自動對齊，否則中午將持續提醒您。
                                             </p>
                                         </div>
                                     </div>
@@ -767,7 +881,7 @@
                                                                     {status.code === 'UNCONFIRMED' ? (
                                                                         <button
                                                                             onClick={() => markAsNoSpending(bill.id)}
-                                                                            className="w-full py-1 text-[9px] font-bold rounded-lg text-slate-600 bg-slate-100 border border-slate-200 active:scale-95"
+                                                                            className="w-full py-1 text-[9px] font-bold rounded-lg text-slate-600 bg-slate-100 border border-slate-200 active:scale-95 transition-all"
                                                                         >
                                                                             本月無消費
                                                                         </button>
@@ -797,9 +911,46 @@
 
                         {activeTab === 'settings' && (
                             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-4">
+                                
+                                {/* Gmail / Google Apps Script 雲端同步設定 */}
+                                <div className="border-b border-slate-100 pb-4 space-y-3">
+                                    <h3 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                                        <CloudIcon className="text-indigo-600 animate-pulse" />
+                                        Gmail 電子帳單自動同步設定
+                                    </h3>
+                                    
+                                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                                🔗 輸入您的 Google 部署網址 (Web App URL)
+                                            </label>
+                                            <input 
+                                                type="url"
+                                                value={gasUrl}
+                                                onChange={(e) => setGasUrl(e.target.value)}
+                                                placeholder="https://script.google.com/macros/s/.../exec"
+                                                className="w-full p-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                                            />
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 leading-relaxed">
+                                            設定完成後，App 開啟時會自動默默連接該網址，讀取 Gmail 解析出來的最新信用卡應繳金額！
+                                        </p>
+                                        {gasUrl && (
+                                            <button 
+                                                onClick={() => syncWithCloud(true)}
+                                                disabled={isSyncing}
+                                                className="w-full py-2 bg-indigo-600 active:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-1 shadow-md shadow-indigo-100"
+                                            >
+                                                <CloudIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                                                {isSyncing ? '同步中，請稍候...' : '立刻手動同步 Gmail 最新帳單'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
                                 <div className="border-b border-slate-100 pb-4 space-y-3">
                                     <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                        <BellIcon className="text-indigo-600 animate-pulse" />
+                                        <BellIcon className="text-indigo-600" />
                                         iOS 系統推播設定
                                     </h3>
                                     
@@ -972,24 +1123,26 @@
                                 <div>
                                     <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                                         <LightBulbIcon className="text-amber-500 w-4 h-4" />
-                                        iPhone 專屬：如何設定中午 12:00 自動通知提醒？
+                                        防漏繳終極設定（Gmail 自動對帳 與 捷徑自動化）
                                     </h2>
-                                    <p className="text-[9px] text-slate-400">只要透過 iOS 內建的「捷徑」App，即可免費實現 100% 穩定的中午逾期警告。</p>
+                                    <p className="text-[9px] text-slate-400">以下兩大核心步驟，將徹底把您的卡費管家升級成無懈可擊的原生 App！</p>
                                 </div>
 
                                 <div className="space-y-3">
                                     <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
-                                        <div className="text-xs font-extrabold text-indigo-900 mb-1.5">第一步：加入 iPhone 主畫面（前提）</div>
+                                        <div className="text-xs font-extrabold text-indigo-900 mb-1.5">第一部分：部署 Gmail 自動爬蟲解析（免伺服器）</div>
+                                        <p className="text-[11px] text-slate-700 leading-relaxed mb-2">
+                                            只要將 Google Apps Script 設定好，Google 後台每天都會默默幫您爬信件，抓出永豐與富邦卡費並存入雲端。
+                                        </p>
                                         <ol className="list-decimal list-inside text-[11px] text-slate-700 space-y-1 leading-relaxed">
-                                            <li>使用 iPhone Safari 瀏覽器打開本程式網址。</li>
-                                            <li>點擊 Safari 底部工具列中間的「分享」按鈕（向上箭頭）。</li>
-                                            <li>點選「<strong>加入主畫面</strong>」。</li>
-                                            <li>從桌面打開這個「卡費管家」，點擊「<strong>啟用 iPhone 系統通知權限</strong>」按鈕允許通知。</li>
+                                            <li>點擊本對話右側的 <strong>`gas_script.js`</strong> 與 <strong>`setup_guide.md`</strong> 檔案。</li>
+                                            <li>按照部署指引，取得專屬部署網址並貼到上方 **「通知與卡片」** 設定頁中。</li>
+                                            <li>隨後即可按下首頁的 **「同步 Gmail」**，測試是否已能全自動記帳！</li>
                                         </ol>
                                     </div>
 
                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                        <div className="text-xs font-bold text-slate-900 mb-1.5">第二步：建立 iPhone 「自動化」排程（2 分鐘搞定）</div>
+                                        <div className="text-xs font-bold text-slate-900 mb-1.5">第二部分：建立 iPhone 中午 12:00 自動化（100% 準時通知）</div>
                                         <ol className="list-decimal list-inside text-[11px] text-slate-600 space-y-1.5 leading-relaxed">
                                             <li>打開 iPhone 內建的「<strong>捷徑 (Shortcuts)</strong>」App。</li>
                                             <li>切換到下方的「<strong>自動化 (Automation)</strong>」分頁，點選右上角「+」或「製作個人自動化」。</li>
@@ -1023,5 +1176,3 @@
     </script>
 </body>
 </html>
-
-```
