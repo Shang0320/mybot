@@ -28,7 +28,7 @@
             -webkit-tap-highlight-color: transparent;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        /* 隱藏滾動條但保持滾動功能 */
+        /* 隱藏滾動條並保持滾動功能 */
         ::-webkit-scrollbar {
             display: none;
         }
@@ -51,21 +51,21 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- 精緻內嵌 SVG 圖示 ---
-        const CreditCardIcon = ({ className = "w-5 h-5" }) => (
+        // --- 精緻內嵌 SVG 圖示 (全面緊湊化) ---
+        const CreditCardIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <rect x="2" y="5" width="20" height="14" rx="2" />
                 <line x1="2" y1="10" x2="22" y2="10" />
             </svg>
         );
 
-        const BellIcon = ({ className = "w-5 h-5", active = false }) => (
+        const BellIcon = ({ className = "w-4 h-4", active = false }) => (
             <svg className={`${className} ${active ? 'animate-bounce' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
         );
 
-        const CalendarIcon = ({ className = "w-5 h-5" }) => (
+        const CalendarIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
@@ -74,32 +74,32 @@
             </svg>
         );
 
-        const CheckIcon = ({ className = "w-5 h-5" }) => (
+        const CheckIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
         );
 
-        const AlertIcon = ({ className = "w-5 h-5" }) => (
+        const AlertIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
         );
 
-        const PlusIcon = ({ className = "w-5 h-5" }) => (
+        const PlusIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
         );
 
-        const LightBulbIcon = ({ className = "w-5 h-5" }) => (
+        const LightBulbIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
         );
 
-        const CloudIcon = ({ className = "w-5 h-5" }) => (
+        const CloudIcon = ({ className = "w-4 h-4" }) => (
             <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
             </svg>
@@ -129,8 +129,7 @@
             // 固定模擬時間：2026 年 5 月 21 日
             const TODAY = useMemo(() => new Date(2026, 4, 21), []); // 4 代表 5 月
 
-            // 【精準同步真實卡片資訊】
-            // 將富邦預設修改為：每月 2 日結帳，18 日截止繳款
+            // 【富邦預設值精準同步：每月 2 日結帳，18 日截止繳款】
             const [cards, setCards] = useState(() => safeGetItem('reminder_cards', [
                 { id: 'sinopac', name: '永豐銀行', dueDate: 15, billCycle: '每月25日結帳', color: 'indigo' },
                 { id: 'fubon', name: '富邦銀行', dueDate: 18, billCycle: '每月2日結帳', color: 'blue' }
@@ -150,11 +149,13 @@
             const [isNoonReminderEnabled, setIsNoonReminderEnabled] = useState(() => safeGetItem('reminder_noon_enabled', true));
             const [fontSizeScale, setFontSizeScale] = useState(() => safeGetItem('reminder_font_size_scale', 100));
 
-            // Gmail GAS 雲端對接網址
+            // 【預先植入您的 GAS 雲端大腦專屬網址，不需重複貼上】
             const [gasUrl, setGasUrl] = useState(() => {
                 try {
-                    return localStorage.getItem('reminder_gas_url') || '';
-                } catch(e) { return ''; }
+                    return localStorage.getItem('reminder_gas_url') || 'https://script.google.com/macros/s/AKfycbxpZY69J1cWryjVU3wrZ014ceAq8WfJ4vfENns-xsBdYlW4zInXo8M3fAz1dd8I5TBE/exec';
+                } catch(e) {
+                    return 'https://script.google.com/macros/s/AKfycbxpZY69J1cWryjVU3wrZ014ceAq8WfJ4vfENns-xsBdYlW4zInXo8M3fAz1dd8I5TBE/exec';
+                }
             });
             const [isSyncing, setIsSyncing] = useState(false);
 
@@ -240,7 +241,7 @@
 
                             setBills(mergedBills);
                             safeSetItem('reminder_bills', mergedBills);
-                            if (forceTriggerAlert) showToast('⚡ 與 Gmail 帳單同步完成！金額已自動登錄！');
+                            if (forceTriggerAlert) showToast('⚡ 與 Gmail 帳單同步完成！金額已自動對帳！');
                         } else {
                             await fetch(gasUrl, {
                                 method: 'POST',
@@ -260,6 +261,7 @@
                 setIsSyncing(false);
             };
 
+            // 每次 App 啟動時自動進行雲端默默對齊
             useEffect(() => {
                 if (gasUrl) {
                     syncWithCloud(false);
@@ -270,7 +272,7 @@
             const getBillStatus = (bill, card) => {
                 if (bill.isPaid) {
                     if (bill.amount === 0) {
-                        return { code: 'NO_SPENDING', text: '🟢 本月無消費', color: 'text-slate-505 bg-slate-100 border-slate-200', daysLeft: null };
+                        return { code: 'NO_SPENDING', text: '🟢 本月無消費', color: 'text-slate-500 bg-slate-100 border-slate-200', daysLeft: null };
                     }
                     return { code: 'PAID', text: '🟢 已繳清', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', daysLeft: null };
                 }
@@ -910,18 +912,19 @@
                         )}
 
                         {activeTab === 'settings' && (
-                            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-4">
+                            // 【通知與卡片面板全面極致緊湊優化：縮減內距、邊界與圖示比例，呈現超精美手機畫面】
+                            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3.5 space-y-3">
                                 
-                                {/* Gmail / Google Apps Script 雲端同步設定 */}
-                                <div className="border-b border-slate-100 pb-4 space-y-3">
+                                {/* Gmail / Google Apps Script 雲端同步設定 (緊縮化) */}
+                                <div className="border-b border-slate-100 pb-3 space-y-2">
                                     <h3 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                                        <CloudIcon className="text-indigo-600 animate-pulse" />
-                                        Gmail 電子帳單自動同步設定
+                                        <CloudIcon className="text-indigo-600 shrink-0" />
+                                        Gmail 電子帳單自動同步
                                     </h3>
                                     
-                                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
+                                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 space-y-2">
                                         <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                            <label className="block text-[9px] font-bold text-slate-500 mb-0.5">
                                                 🔗 輸入您的 Google 部署網址 (Web App URL)
                                             </label>
                                             <input 
@@ -929,56 +932,57 @@
                                                 value={gasUrl}
                                                 onChange={(e) => setGasUrl(e.target.value)}
                                                 placeholder="https://script.google.com/macros/s/.../exec"
-                                                className="w-full p-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                                                className="w-full p-1.5 text-[10px] border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-mono"
                                             />
                                         </div>
-                                        <p className="text-[9px] text-slate-400 leading-relaxed">
-                                            設定完成後，App 開啟時會自動默默連接該網址，讀取 Gmail 解析出來的最新信用卡應繳金額！
+                                        <p className="text-[8.5px] text-slate-400 leading-snug">
+                                            App 開啟或中午 12:00 捷徑開機時，將會自動連線此 API 讀取 Gmail 最新的刷卡與帳單金額，省去手動記帳！
                                         </p>
                                         {gasUrl && (
                                             <button 
                                                 onClick={() => syncWithCloud(true)}
                                                 disabled={isSyncing}
-                                                className="w-full py-2 bg-indigo-600 active:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-1 shadow-md shadow-indigo-100"
+                                                className="w-full py-1.5 bg-indigo-600 active:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-1 shadow-xs"
                                             >
-                                                <CloudIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                                                {isSyncing ? '同步中，請稍候...' : '立刻手動同步 Gmail 最新帳單'}
+                                                <CloudIcon className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                                                {isSyncing ? '同步中...' : '立刻手動同步 Gmail 最新帳單'}
                                             </button>
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="border-b border-slate-100 pb-4 space-y-3">
+                                {/* iOS 系統推播設定 (緊縮化) */}
+                                <div className="border-b border-slate-100 pb-3 space-y-2">
                                     <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                        <BellIcon className="text-indigo-600" />
+                                        <BellIcon className="text-indigo-600 shrink-0" />
                                         iOS 系統推播設定
                                     </h3>
                                     
-                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-slate-600 font-medium">每天對帳時間：</span>
+                                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 space-y-1.5">
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <span className="text-slate-600">對帳鬧鐘時間：</span>
                                             <span className="font-extrabold text-indigo-600">中午 12:00</span>
                                         </div>
-                                        <p className="text-[10px] text-slate-500 leading-relaxed">
-                                            開啟後，系統若在中午檢查到任何一張卡費「已過截止日」或「尚未核對金額（待確認帳單）」，會立刻向您的 iPhone 鎖定畫面發出警告。
+                                        <p className="text-[8.5px] text-slate-400 leading-snug">
+                                            開啟後，每天中午若有「已逾期」或「未確認（待對帳）」卡費，手機鎖定畫面將會準時彈出警告通知。
                                         </p>
 
-                                        <div className="pt-1.5 flex items-center space-x-4">
-                                            <label className="flex items-center space-x-1.5 text-xs text-slate-700 font-bold cursor-pointer">
+                                        <div className="pt-1 flex items-center space-x-3 text-[10px]">
+                                            <label className="flex items-center space-x-1.5 text-slate-700 font-bold cursor-pointer">
                                                 <input
                                                     type="radio"
                                                     checked={isNoonReminderEnabled === true}
                                                     onChange={() => setIsNoonReminderEnabled(true)}
-                                                    className="rounded"
+                                                    className="rounded scale-90"
                                                 />
                                                 <span>開啟提醒</span>
                                             </label>
-                                            <label className="flex items-center space-x-1.5 text-xs text-slate-700 font-bold cursor-pointer">
+                                            <label className="flex items-center space-x-1.5 text-slate-700 font-bold cursor-pointer">
                                                 <input
                                                     type="radio"
                                                     checked={isNoonReminderEnabled === false}
                                                     onChange={() => setIsNoonReminderEnabled(false)}
-                                                    className="rounded"
+                                                    className="rounded scale-90"
                                                 />
                                                 <span>關閉提醒</span>
                                             </label>
@@ -986,31 +990,31 @@
                                     </div>
                                 </div>
 
-                                {/* 字體大小調節拉桿區 */}
-                                <div className="border-b border-slate-100 pb-4 space-y-3">
+                                {/* 字體大小調節拉桿區 (緊縮化) */}
+                                <div className="border-b border-slate-100 pb-3 space-y-2">
                                     <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                        <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <svg className="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                                         </svg>
-                                        A⁺ 手機介面字體大小無級縮放
+                                        Aa 介面字體無級縮放
                                     </h3>
                                     
-                                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-slate-500">目前尺寸比例：<strong className="text-indigo-600">{fontSizeScale}%</strong></span>
+                                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 space-y-2">
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <span className="text-slate-500">目前尺寸比例：<strong className="text-indigo-600">{fontSizeScale}%</strong></span>
                                             <button 
                                                 onClick={() => {
                                                     setFontSizeScale(100);
                                                     showToast('字體比例已恢復為預設的 100%');
                                                 }}
-                                                className="text-[9px] bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform"
+                                                className="text-[8px] bg-white border border-slate-200 text-slate-600 font-bold px-1.5 py-0.5 rounded-md active:scale-95 transition-transform"
                                             >
-                                                重設回預設
+                                                重設預設
                                             </button>
                                         </div>
                                         
-                                        <div className="flex items-center space-x-3">
-                                            <span className="text-[10px] font-bold text-slate-400">Aa (小)</span>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-[9px] font-bold text-slate-400">Aa (小)</span>
                                             <input 
                                                 type="range" 
                                                 min="80" 
@@ -1018,100 +1022,106 @@
                                                 step="5"
                                                 value={fontSizeScale} 
                                                 onChange={(e) => setFontSizeScale(parseInt(e.target.value))}
-                                                className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                                className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                             />
-                                            <span className="text-xs font-black text-slate-700">Aa (大)</span>
+                                            <span className="text-[10px] font-black text-slate-700">Aa (大)</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                                        <CreditCardIcon className="text-indigo-600" />
-                                        卡片基本截止日變更
-                                    </h2>
+                                {/* 卡片基本截止日維護 (緊縮化) */}
+                                <div className="border-b border-slate-100 pb-3 space-y-2">
+                                    <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                        <CreditCardIcon className="text-indigo-600 shrink-0" />
+                                        信用卡截止日變更
+                                    </h3>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {cards.map((card, index) => (
+                                            <div key={card.id} className="border border-slate-100 rounded-xl p-2 bg-slate-50/50 flex flex-col justify-between">
+                                                <div>
+                                                    <h4 className="text-[11px] font-bold text-slate-950">{card.name}</h4>
+                                                    <p className="text-[8.5px] text-slate-400 font-medium">{card.billCycle}</p>
+                                                </div>
+
+                                                <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100">
+                                                    <span className="text-[9px] text-slate-500">截止繳款:</span>
+                                                    <div className="flex items-center space-x-1">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            max="31"
+                                                            value={card.dueDate}
+                                                            onChange={(e) => {
+                                                                const val = Math.min(31, Math.max(1, parseInt(e.target.value) || 1));
+                                                                setCards(prev => prev.map((c, i) => i === index ? { ...c, dueDate: val } : c));
+                                                            }}
+                                                            className="w-8 p-0.5 text-[10px] text-center bg-white border border-slate-200 rounded font-black focus:outline-none"
+                                                        />
+                                                        <span className="text-[9px] text-slate-500">日</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <div className="space-y-3">
-                                    {cards.map((card, index) => (
-                                        <div key={card.id} className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 flex items-center justify-between">
-                                            <div>
-                                                <h4 className="text-xs font-bold text-slate-950">{card.name}</h4>
-                                                <p className="text-[9px] text-slate-400 font-medium">{card.billCycle}</p>
-                                            </div>
+                                {/* 防逾期警戒參數 (緊縮化) */}
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-bold text-slate-950 flex items-center gap-1.5">
+                                        <BellIcon className="text-indigo-600 shrink-0" />
+                                        防逾期警戒參數
+                                    </h3>
 
-                                            <div className="flex items-center space-x-1.5 shrink-0">
-                                                <span className="text-[10px] text-slate-500">截止繳款日:</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl">
+                                            <label className="block text-[8.5px] font-bold text-slate-400 mb-1">
+                                                📅 每月強制對帳日
+                                            </label>
+                                            <div className="flex items-center gap-1 text-[10px]">
+                                                <span>每月</span>
                                                 <input
                                                     type="number"
                                                     min="1"
                                                     max="31"
-                                                    value={card.dueDate}
+                                                    value={alertDayOfMonth}
                                                     onChange={(e) => {
                                                         const val = Math.min(31, Math.max(1, parseInt(e.target.value) || 1));
-                                                        setCards(prev => prev.map((c, i) => i === index ? { ...c, dueDate: val } : c));
+                                                        setAlertDayOfMonth(val);
+                                                        showToast(`已變更警戒日為每月 ${val} 號`);
                                                     }}
-                                                    className="w-12 p-1 text-xs text-center bg-white border border-slate-200 rounded-lg font-black focus:outline-none"
+                                                    className="w-8 p-0.5 text-center border border-slate-200 rounded font-black text-indigo-600 bg-white"
                                                 />
-                                                <span className="text-[10px] text-slate-500">號</span>
+                                                <span>號過後警示</span>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
 
-                                <div className="border-t border-slate-100 pt-4 space-y-3.5">
-                                    <h3 className="text-xs font-bold text-slate-950 flex items-center gap-1.5">
-                                        <BellIcon className="text-indigo-600" />
-                                        防逾期警戒參數
-                                    </h3>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                                            📅 每月強制對帳警戒日（預設每月的 5 號）
-                                        </label>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-xs">每月的</span>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="31"
-                                                value={alertDayOfMonth}
-                                                onChange={(e) => {
-                                                    const val = Math.min(31, Math.max(1, parseInt(e.target.value) || 1));
-                                                    setAlertDayOfMonth(val);
-                                                    showToast(`已成功變更警戒檢查日為每月 ${val} 號`);
-                                                }}
-                                                className="w-14 p-1 text-xs text-center border border-slate-200 rounded-lg font-black text-indigo-600 bg-slate-50 focus:outline-none"
-                                            />
-                                            <span className="text-xs">號</span>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                                            ⏰ 截止日前幾天起開始顯示黃色警告？
-                                        </label>
-                                        <div className="flex items-center gap-4 mt-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                            <label className="flex items-center space-x-1.5 text-xs font-medium cursor-pointer">
-                                                <input
-                                                    type="radio"
-                                                    name="daysbefore"
-                                                    checked={remindDaysBefore === 3}
-                                                    onChange={() => setRemindDaysBefore(3)}
-                                                    className="rounded"
-                                                />
-                                                <span>3 天前</span>
+                                        <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl">
+                                            <label className="block text-[8.5px] font-bold text-slate-400 mb-1">
+                                                ⏰ 截止前幾天起顯示警告？
                                             </label>
-                                            <label className="flex items-center space-x-1.5 text-xs font-medium cursor-pointer">
-                                                <input
-                                                    type="radio"
-                                                    name="daysbefore"
-                                                    checked={remindDaysBefore === 5}
-                                                    onChange={() => setRemindDaysBefore(5)}
-                                                    className="rounded"
-                                                />
-                                                <span>5 天前</span>
-                                            </label>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <label className="flex items-center space-x-1 text-[10px] font-medium cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="daysbefore"
+                                                        checked={remindDaysBefore === 3}
+                                                        onChange={() => setRemindDaysBefore(3)}
+                                                        className="scale-90"
+                                                    />
+                                                    <span>3天前</span>
+                                                </label>
+                                                <label className="flex items-center space-x-1 text-[10px] font-medium cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="daysbefore"
+                                                        checked={remindDaysBefore === 5}
+                                                        onChange={() => setRemindDaysBefore(5)}
+                                                        className="scale-90"
+                                                    />
+                                                    <span>5天前</span>
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
