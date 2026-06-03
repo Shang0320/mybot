@@ -757,9 +757,6 @@
             return (
                 <div className="min-h-screen bg-[#1e1f22] text-slate-100 pb-16 relative">
 
-                    {/* 頂部霓虹極光呼吸線 */}
-                    <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-600 shadow-[0_0_12px_rgba(34,211,238,0.4)] z-50"></div>
-
                     {/* iOS 風格的確定重設對話框 */}
                     {showResetConfirm && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -789,7 +786,10 @@
                     )}
 
                     {/* App 頂部狀態列 */}
-                    <header className="sticky top-0 z-40 bg-[#1a1b1e]/95 border-b border-[#2c2d30] shadow-lg backdrop-blur-md pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 px-4 relative">
+                    <header className="sticky top-0 z-40 bg-[#1a1b1e]/95 border-b border-[#2c2d30] shadow-lg backdrop-blur-md pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 px-4">
+                        {/* 頂部霓虹極光呼吸線 */}
+                        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-600 shadow-[0_0_12px_rgba(34,211,238,0.4)] z-50"></div>
+
                         {/* 背景科幻定位線 */}
                         <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-indigo-900/30 to-transparent"></div>
 
@@ -797,7 +797,7 @@
                             <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center space-x-2.5">
                                     <div className="p-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl text-white shadow-md shadow-indigo-950/50 shrink-0 relative">
-                                        <CreditCardIcon className="w-5 h-5 text-cyan-300" />
+                                        <CreditCardIcon className="w-5 h-5" style={{ color: '#22d3ee' }} />
                                         <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
                                     </div>
                                     <div>
@@ -865,7 +865,7 @@
                                 <div className="mr-2.5 shrink-0">
                                     {toast.type === 'success' && <CheckIcon className="w-5 h-5 text-emerald-400" />}
                                     {toast.type === 'warning' && <AlertIcon className="w-5 h-5 text-rose-400" />}
-                                    {toast.type === 'info' && <BellIcon className="w-5 h-5 text-cyan-400" />}
+                                    {toast.type === 'info' && <BellIcon className="w-5 h-5" style={{ color: '#22d3ee' }} />}
                                 </div>
                                 <p className="text-xs font-bold leading-snug">{toast.message}</p>
                             </div>
@@ -909,7 +909,7 @@
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center space-x-2">
-                                            <span className="p-1.5 bg-[#1a1b1e] border border-slate-800 rounded-lg text-cyan-400 shadow-inner">
+                                            <span className="p-1.5 bg-[#1a1b1e] border border-slate-800 rounded-lg shadow-inner" style={{ color: '#22d3ee' }}>
                                                 <BellIcon className="w-4 h-4" />
                                             </span>
                                             <div>
