@@ -35,6 +35,170 @@
         ::-webkit-scrollbar {
             display: none;
         }
+
+        /* ==========================================================================
+           淺色鐵灰主題 (Light Iron Gray Theme) & 字型加大 2 號覆寫區
+           ========================================================================== */
+        :root {
+            --bg-main: #eef2f6;       /* 現代感淺鐵灰背景 */
+            --bg-card: #ffffff;       /* 白色卡片 */
+            --bg-subcard: #e2e8f0;    /* 淺灰色副卡片 */
+            --bg-input: #ffffff;      /* 輸入框背景 */
+            --border-color: #cbd5e1;  /* 淺色邊框 */
+            --text-primary: #0f172a;  /* 深色主要文字 */
+            --text-secondary: #475569;/* 中灰色次要文字 */
+            --text-muted: #64748b;    /* 淺灰色輔助文字 */
+        }
+
+        /* 覆寫背景與基礎文字顏色 */
+        body, .bg-\[\#242528\], .bg-\[\#1e1f22\] {
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .min-h-screen {
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+        }
+
+        header.bg-\[\#1a1b1e\]\/95 {
+            background-color: rgba(248, 250, 252, 0.9) !important;
+            border-bottom-color: var(--border-color) !important;
+        }
+
+        .bg-\[\#111625\] {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .bg-\[\#202124\] {
+            background-color: #e2e8f0 !important; /* Tab 分頁器外框 */
+            border-color: var(--border-color) !important;
+        }
+
+        /* Tab active 按鈕 */
+        .bg-\[\#37393f\] {
+            background-color: var(--bg-card) !important;
+            color: #4f46e5 !important; /* 變更為靛藍色 */
+            border-color: rgba(79, 70, 229, 0.15) !important;
+        }
+
+        .bg-\[\#2a2b2f\]\/80 {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        /* 漸層控制區 */
+        .bg-gradient-to-br.from-indigo-950\/10.to-slate-800\/60 {
+            background-image: linear-gradient(to bottom right, rgba(99, 102, 241, 0.08), rgba(255, 255, 255, 0.9)) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .bg-\[\#1e1f22\]\/20 {
+            background-color: rgba(226, 232, 240, 0.4) !important;
+        }
+
+        .bg-\[\#232428\] {
+            background-color: var(--bg-subcard) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .bg-\[\#18191c\] {
+            background-color: var(--bg-input) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .bg-\[\#202124\]\/50 {
+            background-color: rgba(226, 232, 240, 0.6) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .bg-indigo-950\/10 {
+            background-color: rgba(238, 242, 255, 0.6) !important;
+            border-color: rgba(99, 102, 241, 0.25) !important;
+        }
+
+        /* 覆寫主要文字與次要文字顏色 */
+        .text-slate-100, .text-slate-200, .text-slate-300 {
+            color: var(--text-primary) !important;
+        }
+
+        .text-slate-400 {
+            color: var(--text-secondary) !important;
+        }
+
+        .text-slate-500 {
+            color: var(--text-muted) !important;
+        }
+
+        /* 原本藍綠色 (cyan) 在淺色背景下對比度不足，改為精緻的靛藍色 (indigo) */
+        .text-cyan-400 {
+            color: #4f46e5 !important;
+        }
+        .text-cyan-300 {
+            color: #3730a3 !important;
+        }
+        .border-cyan-500\/30, .border-cyan-800\/30 {
+            border-color: rgba(79, 70, 229, 0.3) !important;
+        }
+        .bg-cyan-950\/30 {
+            background-color: rgba(79, 70, 229, 0.08) !important;
+        }
+        .bg-cyan-950\/50 {
+            background-color: rgba(79, 70, 229, 0.12) !important;
+        }
+
+        /* 狀態警告色與底色在淺色背景下的優雅適應 */
+        .text-amber-400 {
+            color: #d97706 !important; /* amber-600 */
+        }
+        .bg-amber-950\/40 {
+            background-color: #fef3c7 !important; /* amber-100 */
+            border-color: #fde68a !important;      /* amber-200 */
+        }
+        .text-rose-400 {
+            color: #e11d48 !important; /* rose-600 */
+        }
+        .bg-rose-950\/50 {
+            background-color: #ffe4e6 !important; /* rose-100 */
+            border-color: #fecdd3 !important;      /* rose-200 */
+        }
+        .text-emerald-400 {
+            color: #059669 !important; /* emerald-600 */
+        }
+        .bg-emerald-950\/40 {
+            background-color: #d1fae5 !important; /* emerald-100 */
+            border-color: #a7f3d0 !important;      /* emerald-200 */
+        }
+
+        /* 統一邊框顏色 */
+        .border-slate-800, .border-slate-850, .border-\[\#2c2d30\], .border-\[\#232428\] {
+            border-color: var(--border-color) !important;
+        }
+
+        /* 下拉選單 Option 背景 */
+        select option {
+            background-color: var(--bg-card) !important;
+            color: var(--text-primary) !important;
+        }
+
+        /* 重設確認框與部分深色按鈕微調 */
+        .bg-slate-900 {
+            background-color: var(--bg-subcard) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .text-slate-500 {
+            color: var(--text-muted) !important;
+        }
+
+        /* 淺色背景網格線條 */
+        body {
+            background-image: linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1px, transparent 1px) !important;
+        }
     </style>
 </head>
 
@@ -184,10 +348,10 @@
                 } catch (e) { }
             }, [gasUrl]);
 
-            // 監聽字體大小改變並直接寫入 HTML 根節點以實現放大拉桿
+            // 監聽字體大小改變並直接寫入 HTML 根節點以實現放大拉桿（基礎字體加大2號，相當於額外乘上 1.125 倍）
             useEffect(() => {
                 safeSetItem('reminder_font_size_scale', fontSizeScale);
-                document.documentElement.style.fontSize = `${fontSizeScale}%`;
+                document.documentElement.style.fontSize = `${fontSizeScale * 1.125}%`;
             }, [fontSizeScale]);
 
             useEffect(() => {
