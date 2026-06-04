@@ -24,11 +24,20 @@
 
     <style>
         /* 針對 iOS 滿版全螢幕微調，提供頂部與底部安全邊距 */
+        html {
+            min-height: 100%;
+            background: #eef2f6;
+            overflow-x: hidden;
+        }
+
         body {
-            padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
             -webkit-tap-highlight-color: transparent;
+            -webkit-overflow-scrolling: touch;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100%;
+            overflow-x: hidden;
+            overscroll-behavior-y: none;
         }
 
         /* 隱藏滾動條並保持滾動功能 */
@@ -48,6 +57,10 @@
             --text-primary: #0f172a;  /* 深色主要文字 */
             --text-secondary: #475569;/* 中灰色次要文字 */
             --text-muted: #64748b;    /* 淺灰色輔助文字 */
+            --iphone-15-pro-width: 393px;
+            --fixed-header-height: 146px;
+            --clay-shadow: 7px 9px 18px rgba(111, 126, 153, 0.23), -6px -7px 14px rgba(255, 255, 255, 0.92), inset 1px 1px 1px rgba(255, 255, 255, 0.78);
+            --clay-inset: inset 4px 4px 9px rgba(125, 139, 164, 0.20), inset -4px -4px 8px rgba(255, 255, 255, 0.86);
         }
 
         /* 覆寫背景與基礎文字顏色 */
@@ -62,18 +75,20 @@
         }
 
         header.bg-\[\#1a1b1e\]\/95 {
-            background-color: rgba(248, 250, 252, 0.9) !important;
-            border-bottom-color: var(--border-color) !important;
+            background-color: rgba(241, 245, 249, 0.94) !important;
+            border-bottom-color: rgba(203, 213, 225, 0.65) !important;
         }
 
         .bg-\[\#111625\] {
             background-color: var(--bg-card) !important;
             border-color: var(--border-color) !important;
+            box-shadow: var(--clay-shadow) !important;
         }
 
         .bg-\[\#202124\] {
             background-color: #e2e8f0 !important; /* Tab 分頁器外框 */
             border-color: var(--border-color) !important;
+            box-shadow: var(--clay-inset) !important;
         }
 
         /* Tab active 按鈕 */
@@ -81,11 +96,13 @@
             background-color: var(--bg-card) !important;
             color: #4f46e5 !important; /* 變更為靛藍色 */
             border-color: rgba(79, 70, 229, 0.15) !important;
+            box-shadow: 4px 5px 10px rgba(111, 126, 153, 0.18), -3px -4px 9px rgba(255, 255, 255, 0.9) !important;
         }
 
         .bg-\[\#2a2b2f\]\/80 {
             background-color: rgba(255, 255, 255, 0.95) !important;
             border-color: var(--border-color) !important;
+            box-shadow: var(--clay-shadow) !important;
         }
 
         /* 漸層控制區 */
@@ -101,12 +118,14 @@
         .bg-\[\#232428\] {
             background-color: var(--bg-subcard) !important;
             border-color: var(--border-color) !important;
+            box-shadow: 4px 5px 12px rgba(111, 126, 153, 0.16), -4px -5px 12px rgba(255, 255, 255, 0.72), inset 1px 1px 1px rgba(255, 255, 255, 0.55) !important;
         }
 
         .bg-\[\#18191c\] {
             background-color: var(--bg-input) !important;
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
+            box-shadow: var(--clay-inset) !important;
         }
 
         .bg-\[\#202124\]\/50 {
@@ -198,6 +217,80 @@
         body {
             background-image: linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
                               linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1px, transparent 1px) !important;
+            touch-action: pan-y;
+        }
+
+        .app-shell {
+            width: min(100%, var(--iphone-15-pro-width));
+            margin-inline: auto;
+        }
+
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%) translateZ(0);
+            width: min(100%, var(--iphone-15-pro-width));
+            min-height: calc(var(--fixed-header-height) + env(safe-area-inset-top, 0px));
+            -webkit-backdrop-filter: blur(18px);
+            backdrop-filter: blur(18px);
+            contain: paint;
+            will-change: transform;
+            isolation: isolate;
+        }
+
+        .app-main {
+            padding-top: calc(var(--fixed-header-height) + env(safe-area-inset-top, 0px) + 16px);
+        }
+
+        .app-toast {
+            top: calc(var(--fixed-header-height) + env(safe-area-inset-top, 0px) + 10px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(calc(100% - 24px), 369px);
+        }
+
+        .clay-button {
+            box-shadow: 3px 4px 9px rgba(111, 126, 153, 0.18), -3px -4px 8px rgba(255, 255, 255, 0.88);
+        }
+
+        .brand-title {
+            font-size: 0.96rem;
+            line-height: 1.1;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
+        .version-pill {
+            font-size: 0.46rem;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .header-action {
+            font-size: 0.58rem;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .pay-amount {
+            font-size: 1.08rem;
+            line-height: 1.3;
+            letter-spacing: 0;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 374px) {
+            :root {
+                --fixed-header-height: 154px;
+            }
+
+            .pay-amount {
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
@@ -295,7 +388,7 @@
         };
 
         function App() {
-            // 模擬時間：改為當前現在日期 (2026-06-03)
+            // 模擬時間：改為當前現在日期
             const TODAY = useMemo(() => new Date(), []);
 
             // 【富邦預設值精準同步：每月 2 日結帳，18 日截止繳款】
@@ -331,10 +424,11 @@
             const [notificationPermission, setNotificationPermission] = useState('default');
             const [editingCell, setEditingCell] = useState(null);
             const [editValue, setEditValue] = useState('');
-            const [toast, setToast] = useState(null);
+                       const [toast, setToast] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [newMonthVal, setNewMonthVal] = useState(8);
             const [showResetConfirm, setShowResetConfirm] = useState(false);
+            const [showUnpaidDetailModal, setShowUnpaidDetailModal] = useState(false);
 
             // 當狀態改變時，寫入 LocalStorage 儲存
             useEffect(() => { safeSetItem('reminder_cards', cards); }, [cards]);
@@ -358,6 +452,27 @@
                 if ('Notification' in window) {
                     setNotificationPermission(Notification.permission);
                 }
+            }, []);
+
+            useEffect(() => {
+                let startY = 0;
+                const onTouchStart = (event) => {
+                    startY = event.touches?.[0]?.clientY || 0;
+                };
+                const onTouchMove = (event) => {
+                    const currentY = event.touches?.[0]?.clientY || 0;
+                    const pullingDownAtTop = window.scrollY <= 0 && currentY > startY;
+                    if (pullingDownAtTop) {
+                        event.preventDefault();
+                    }
+                };
+
+                document.addEventListener('touchstart', onTouchStart, { passive: true });
+                document.addEventListener('touchmove', onTouchMove, { passive: false });
+                return () => {
+                    document.removeEventListener('touchstart', onTouchStart);
+                    document.removeEventListener('touchmove', onTouchMove);
+                };
             }, []);
 
             const showToast = (message, type = 'success') => {
@@ -495,7 +610,9 @@
                 let overdueCount = 0;
                 let upcomingCount = 0;
                 let unconfirmedCount = 0;
+                let attentionTotal = 0;
                 const alertList = [];
+                const unpaidList = [];
 
                 bills.forEach(bill => {
                     const card = cards.find(c => c.id === bill.cardId);
@@ -504,8 +621,10 @@
 
                     if (bill.amount > 0 && !bill.isPaid) {
                         totalUnpaid += bill.amount;
+                        unpaidList.push({ bill, card, status });
                         if (status.code === 'OVERDUE') {
                             overdueCount++;
+                            attentionTotal += bill.amount;
                             alertList.push({ bill, card, status, priority: 1 });
                         } else if (status.code === 'WARNING') {
                             upcomingCount++;
@@ -517,7 +636,7 @@
                     }
                 });
 
-                return { totalUnpaid, overdueCount, upcomingCount, unconfirmedCount, alertList };
+                return { totalUnpaid, overdueCount, upcomingCount, unconfirmedCount, attentionTotal, alertList, unpaidList };
             }, [bills, cards, remindDaysBefore]);
 
             // iOS 原生通知觸發
@@ -785,24 +904,88 @@
                         </div>
                     )}
 
+                    {/* 未繳帳單明細對話框 */}
+                    {showUnpaidDetailModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                            <div className="bg-[#111625] border border-slate-800 rounded-3xl p-5 max-w-xs w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[80vh]">
+                                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-indigo-500"></div>
+                                <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-indigo-500"></div>
+                                
+                                <div className="flex items-center justify-between border-b border-slate-850 pb-3 mb-4 shrink-0">
+                                    <h3 className="font-black text-slate-100 text-sm flex items-center gap-1.5 font-mono">
+                                        <CreditCardIcon className="w-4 h-4" style={{ color: '#22d3ee' }} />
+                                        未繳帳單明細
+                                    </h3>
+                                    <button 
+                                        onClick={() => setShowUnpaidDetailModal(false)}
+                                        className="text-[10px] text-slate-500 hover:text-rose-400 font-mono border border-slate-850 px-2 py-0.5 rounded-lg bg-slate-900 active:scale-95 transition-transform"
+                                    >
+                                        [關閉]
+                                    </button>
+                                </div>
+
+                                <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+                                    {stats.unpaidList.length === 0 ? (
+                                        <div className="text-center py-8 text-xs text-slate-400">
+                                            🎉 所有帳單已繳清，目前無未繳款項！
+                                        </div>
+                                    ) : (
+                                        stats.unpaidList.map(({ bill, card, status }) => (
+                                            <div key={bill.id} className="bg-[#1e1f22]/60 border border-slate-850 rounded-xl p-3 flex items-center justify-between gap-3">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs font-black text-slate-100">{card.name}</span>
+                                                        <span className="text-[8px] font-mono text-cyan-400 bg-cyan-950/50 px-1 py-0.5 rounded border border-cyan-800/30">
+                                                            {bill.month}月
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs font-extrabold text-white font-mono">
+                                                        ${bill.amount.toLocaleString()}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-md border ${status.color}`}>
+                                                            {status.text}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => togglePaid(bill.id)}
+                                                    className="px-2.5 py-1 bg-emerald-600 active:bg-emerald-700 text-white rounded-lg text-[9px] font-bold active:scale-95 transition-transform shrink-0"
+                                                >
+                                                    標記已繳
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="border-t border-slate-850 pt-3 mt-4 flex items-center justify-between text-[10px] shrink-0 font-mono">
+                                    <span className="text-slate-400 font-bold">筆數 : {stats.unpaidList.length} 筆</span>
+                                    <span className="text-cyan-400 font-extrabold">總額 : ${stats.totalUnpaid.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* App 頂部狀態列 */}
-                    <header className="sticky top-0 z-40 bg-[#1a1b1e]/95 border-b border-[#2c2d30] shadow-lg backdrop-blur-md pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 px-4">
+                    <header className="app-header z-40 bg-[#1a1b1e]/95 border-b border-[#2c2d30] shadow-lg pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 px-2">
                         {/* 頂部霓虹極光呼吸線 */}
                         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-600 shadow-[0_0_12px_rgba(34,211,238,0.4)] z-50"></div>
 
                         {/* 背景科幻定位線 */}
                         <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-indigo-900/30 to-transparent"></div>
 
-                        <div className="max-w-md mx-auto flex flex-col items-center gap-2.5">
-                            <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center space-x-2.5">
-                                    <div className="p-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl text-white shadow-md shadow-indigo-950/50 shrink-0 relative">
+                        <div className="app-shell px-2 flex flex-col items-center gap-2.5">
+                            <div className="flex items-center justify-between w-full gap-2">
+                                <div className="flex items-center space-x-2 min-w-0">
+                                    <div className="p-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl text-white shadow-md shadow-indigo-950/50 shrink-0 relative clay-button">
                                         <CreditCardIcon className="w-5 h-5" style={{ color: '#22d3ee' }} />
                                         <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
                                     </div>
-                                    <div>
-                                        <h1 className="text-base font-black tracking-widest text-slate-100 flex items-center gap-1.5 font-mono">
-                                            卡費管家 <span className="text-[8px] font-mono text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded bg-cyan-950/30">系統 V2.1</span>
+                                    <div className="min-w-0">
+                                        <h1 className="brand-title font-black text-slate-100 flex items-center gap-1 font-mono">
+                                            卡費管家 <span className="version-pill font-mono text-cyan-400 border border-cyan-500/30 px-1.5 py-1 rounded bg-cyan-950/30">系統 V2.1</span>
                                         </h1>
                                         <p className="text-[9px] text-slate-400 font-mono">
                                             模擬日期 : {`${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`}
@@ -815,7 +998,7 @@
                                         <button
                                             onClick={() => syncWithCloud(true)}
                                             disabled={isSyncing}
-                                            className="text-[10px] text-cyan-400 font-bold px-2 py-1 rounded-lg border border-cyan-500/30 bg-cyan-950/30 flex items-center gap-1 active:scale-95 transition-transform"
+                                            className="header-action text-cyan-400 font-bold px-2 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-950/30 flex items-center gap-1 active:scale-95 transition-transform clay-button"
                                         >
                                             <CloudIcon className={`w-3 h-3 ${isSyncing ? 'animate-spin text-cyan-300' : 'text-cyan-400'}`} />
                                             {isSyncing ? '同步中' : '同步 Gmail'}
@@ -823,7 +1006,7 @@
                                     )}
                                     <button
                                         onClick={() => setShowResetConfirm(true)}
-                                        className="text-[10px] text-slate-500 hover:text-rose-400 font-mono px-2.5 py-1 rounded-lg border border-slate-850 bg-slate-900 active:scale-95 transition-transform"
+                                        className="header-action text-slate-500 hover:text-rose-400 font-mono px-2 py-1.5 rounded-lg border border-slate-850 bg-slate-900 active:scale-95 transition-transform clay-button"
                                     >
                                         [重設]
                                     </button>
@@ -855,10 +1038,10 @@
                     </header>
 
                     {/* App 主畫面 */}
-                    <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
+                    <main className="app-main app-shell px-4 space-y-4">
 
                         {toast && (
-                            <div className={`fixed top-4 left-4 right-4 z-50 flex items-center p-3.5 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-300 transform translate-y-0 ${toast.type === 'success' ? 'bg-[#0f241d]/95 border-emerald-900/60 text-emerald-300' :
+                            <div className={`app-toast fixed z-50 flex items-center p-3.5 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-300 ${toast.type === 'success' ? 'bg-[#0f241d]/95 border-emerald-900/60 text-emerald-300' :
                                 toast.type === 'warning' ? 'bg-[#2a0e14]/95 border-rose-950 text-rose-300' :
                                     'bg-slate-950/95 text-white border-slate-900'
                                 }`}>
@@ -874,29 +1057,30 @@
                         {activeTab === 'dashboard' && (
                             <>
                                 {/* 卡片快速狀態展示區 */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-[#2a2b2f]/80 p-4 rounded-2xl border border-slate-850 shadow-lg relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-indigo-500/30"></div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">本期未繳總計</p>
-                                        <p className="text-xl font-extrabold text-white mt-1">
-                                            ${stats.totalUnpaid.toLocaleString()}
-                                        </p>
-                                        <div className="text-[9px] text-cyan-400/80 mt-1 flex items-center gap-1 font-mono">
-                                            {gasUrl ? '● 雲端同步已開啟' : '● 僅限本機儲存'}
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-[#2a2b2f]/80 p-4 rounded-2xl border border-slate-850 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div
+                                        onClick={() => setShowUnpaidDetailModal(true)}
+                                        className="bg-[#2a2b2f]/80 p-4 rounded-2xl border border-slate-850 shadow-lg relative overflow-hidden flex items-center justify-between gap-4 cursor-pointer active:scale-[0.985] transition-all"
+                                        title="點擊查看需處理明細"
+                                    >
                                         <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-indigo-500/30"></div>
-                                        <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wide flex items-center gap-1">
+                                        <div>
+                                            <p className="text-[11px] font-black text-amber-500 uppercase tracking-wide flex items-center gap-1">
                                             <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping"></span>
                                             未確認/逾期
-                                        </p>
-                                        <p className="text-xl font-extrabold text-amber-500 mt-1">
-                                            {(stats.overdueCount + stats.unconfirmedCount)} <span className="text-xs font-normal text-slate-400">筆</span>
-                                        </p>
-                                        <div className="text-[9px] text-amber-500 mt-1 font-bold font-mono">
-                                            {stats.unconfirmedCount > 0 ? '[ 待核對 ]' : '[ 系統安全 ]'}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-1 font-mono">
+                                                {stats.unconfirmedCount > 0 ? '[ 待核對帳單 ]' : '[ 逾期警戒 ]'}
+                                            </p>
+                                            <p className="text-[11px] text-slate-500 mt-2 font-bold">
+                                                總金額 <span className="text-amber-600 font-black font-mono">${stats.attentionTotal.toLocaleString()}</span>
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-3xl font-black text-amber-500 leading-none">
+                                                {(stats.overdueCount + stats.unconfirmedCount)}
+                                            </p>
+                                            <p className="text-[11px] font-bold text-slate-400 mt-1">筆</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1056,7 +1240,7 @@
                                                                                 setEditingCell(bill.id);
                                                                                 setEditValue(bill.amount.toString());
                                                                             }}
-                                                                            className="text-xs font-bold font-mono text-slate-100 cursor-pointer py-1 px-1 bg-[#18191c] border border-slate-800 rounded text-center hover:bg-slate-900 transition-colors"
+                                                                            className="pay-amount font-bold font-mono text-slate-100 cursor-pointer py-1 px-1 bg-[#18191c] border border-slate-800 rounded text-center hover:bg-slate-900 transition-colors"
                                                                             title="點擊編輯應繳金額"
                                                                         >
                                                                             ${bill.amount.toLocaleString()}
